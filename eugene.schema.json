@@ -1,0 +1,120 @@
+{
+  "$id": "https://schemas.kolasiak.pl/eugene-config/v2.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Eugene Configuration",
+  "description": "Configuration schema for Eugene OpenAPI Interface Kit - oink! 🐷",
+  "type": "object",
+  "required": ["spec", "go"],
+  "properties": {
+    "spec": {
+      "type": "string",
+      "description": "Path to the OpenAPI specification file"
+    },
+    "templates": {
+      "type": "object",
+      "description": "Custom templates configuration",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "description": "Directory containing custom templates"
+        }
+      },
+      "additionalProperties": false
+    },
+    "exclude-schemas": {
+      "type": "array",
+      "description": "Schemas to exclude from generation",
+      "items": {
+        "type": "string"
+      }
+    },
+    "include-tags": {
+      "type": "array",
+      "description": "Generate only for operations with these tags",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exclude-tags": {
+      "type": "array",
+      "description": "Exclude operations with these tags",
+      "items": {
+        "type": "string"
+      }
+    },
+    "go": {
+      "type": "object",
+      "description": "Go-specific generation options",
+      "required": ["output-dir", "package"],
+      "properties": {
+        "output-dir": {
+          "type": "string",
+          "description": "Output directory for generated Go files"
+        },
+        "package": {
+          "type": "string",
+          "description": "Go package name for generated code"
+        },
+        "server-framework": {
+          "type": "string",
+          "description": "Server framework for generated server code",
+          "enum": ["echo", "chi", "stdlib"],
+          "default": "echo"
+        },
+        "types": {
+          "type": "object",
+          "description": "Type generation options",
+          "properties": {
+            "enum-strategy": {
+              "type": "string",
+              "description": "Enum generation strategy",
+              "enum": ["const", "type", "struct"],
+              "default": "const"
+            },
+            "uuid-package": {
+              "type": "string",
+              "description": "UUID type handling",
+              "enum": ["string", "google", "gofrs"],
+              "default": "string"
+            },
+            "nullable-strategy": {
+              "type": "string",
+              "description": "Nullable field strategy",
+              "enum": ["pointer", "nullable"],
+              "default": "pointer"
+            }
+          },
+          "additionalProperties": false
+        },
+        "output-options": {
+          "type": "object",
+          "description": "Output generation options",
+          "properties": {
+            "enable-yaml-tags": {
+              "type": "boolean",
+              "description": "Generate yaml tags alongside json tags",
+              "default": false
+            },
+            "additional-initialisms": {
+              "type": "array",
+              "description": "Additional initialisms for naming conventions",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "import-mapping": {
+          "type": "object",
+          "description": "Custom import mappings for schema references",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

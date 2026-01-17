@@ -1,0 +1,63 @@
+openapi: "3.0.3"
+info:
+  title: Discriminator Test
+  version: "1.0.0"
+paths:
+  /payments:
+    post:
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentSource"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentResult"
+components:
+  schemas:
+    PaymentSource:
+      oneOf:
+        - $ref: "#/components/schemas/CardPayment"
+        - $ref: "#/components/schemas/BankPayment"
+      discriminator:
+        propertyName: type
+        mapping:
+          card: "#/components/schemas/CardPayment"
+          bank: "#/components/schemas/BankPayment"
+    CardPayment:
+      type: object
+      required: [type, cardNumber, expiryMonth, expiryYear]
+      properties:
+        type:
+          type: string
+          const: card
+        cardNumber:
+          type: string
+        expiryMonth:
+          type: integer
+        expiryYear:
+          type: integer
+    BankPayment:
+      type: object
+      required: [type, accountNumber, routingNumber]
+      properties:
+        type:
+          type: string
+          const: bank
+        accountNumber:
+          type: string
+        routingNumber:
+          type: string
+    PaymentResult:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string

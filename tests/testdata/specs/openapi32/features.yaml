@@ -1,0 +1,198 @@
+openapi: "3.2.0"
+info:
+  title: OpenAPI 3.2 Features Test
+  version: "1.0.0"
+  description: Testing OpenAPI 3.2 specific features
+tags:
+  - name: resources
+    description: Resource management operations
+    kind: namespace
+  - name: search
+    description: Search operations
+    parent: resources
+  - name: events
+    description: Event streaming
+    parent: resources
+  - name: items
+    description: Item management
+    parent: resources
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /search:
+    query:
+      operationId: searchItems
+      tags:
+        - search
+      summary: Search using QUERY method
+      description: Uses the new QUERY HTTP method for complex search queries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchQuery"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SearchResult"
+  /events:
+    get:
+      operationId: streamEvents
+      tags:
+        - events
+      summary: Stream events via SSE
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/Event"
+  /items:
+    get:
+      operationId: listItems
+      tags:
+        - items
+      summary: List items with query parameter
+      parameters:
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Item"
+  /stream/sse:
+    get:
+      operationId: streamSSE
+      tags:
+        - events
+      summary: Stream data via SSE with itemSchema
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              itemSchema:
+                $ref: "#/components/schemas/StreamItem"
+  /stream/jsonl:
+    get:
+      operationId: streamJSONL
+      tags:
+        - events
+      summary: Stream data via JSON Lines
+      responses:
+        "200":
+          description: JSONL stream
+          content:
+            application/jsonl:
+              itemSchema:
+                $ref: "#/components/schemas/StreamItem"
+  /advanced-search:
+    get:
+      operationId: advancedSearch
+      summary: Advanced search using querystring parameter
+      parameters:
+        - name: query
+          in: querystring
+          content:
+            application/x-www-form-urlencoded:
+              schema:
+                $ref: "#/components/schemas/AdvancedSearchQuery"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SearchResult"
+components:
+  schemas:
+    SearchQuery:
+      type: object
+      properties:
+        query:
+          type: string
+        filters:
+          type: object
+          additionalProperties:
+            type: string
+        limit:
+          type: integer
+          format: int32
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+        score:
+          type: number
+          format: float
+        data:
+          type: object
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        data:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    StreamItem:
+      type: object
+      properties:
+        id:
+          type: string
+        payload:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    AdvancedSearchQuery:
+      type: object
+      properties:
+        q:
+          type: string
+          description: Search query text
+        filters:
+          type: object
+          additionalProperties:
+            type: string
+          description: Key-value filter pairs
+        sort:
+          type: array
+          items:
+            type: string
+          description: Sort fields
+        page:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32

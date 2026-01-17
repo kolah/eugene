@@ -1,0 +1,44 @@
+openapi: "3.0.3"
+info:
+  title: AllOf Composition Test
+  version: "1.0.0"
+paths:
+  /persons:
+    post:
+      operationId: createPerson
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonWithID"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonWithID"
+components:
+  schemas:
+    BaseProperties:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+    Person:
+      allOf:
+        - $ref: "#/components/schemas/BaseProperties"
+        - type: object
+          required: [firstName, lastName]
+    PersonWithID:
+      allOf:
+        - $ref: "#/components/schemas/Person"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+          required: [id]

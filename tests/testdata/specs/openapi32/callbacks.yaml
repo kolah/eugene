@@ -1,0 +1,68 @@
+openapi: "3.2.0"
+info:
+  title: Callbacks Test
+  version: "1.0.0"
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderRequest"
+      callbacks:
+        orderProcessed:
+          "{$request.body#/callbackUrl}":
+            post:
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      $ref: "#/components/schemas/OrderCallback"
+              responses:
+                "200":
+                  description: Callback received
+      responses:
+        "202":
+          description: Order accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderAccepted"
+components:
+  schemas:
+    OrderRequest:
+      type: object
+      required: [items, callbackUrl]
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+        callbackUrl:
+          type: string
+          format: uri
+    OrderAccepted:
+      type: object
+      properties:
+        orderId:
+          type: string
+        status:
+          type: string
+          const: processing
+    OrderCallback:
+      type: object
+      required: [orderId, status, timestamp]
+      properties:
+        orderId:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed]
+        result:
+          type: object
+        timestamp:
+          type: string
+          format: date-time

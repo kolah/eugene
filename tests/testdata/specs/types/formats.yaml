@@ -1,0 +1,46 @@
+openapi: "3.0.3"
+info:
+  title: String Formats Test
+  version: "1.0.0"
+paths:
+  /records:
+    get:
+      operationId: listRecords
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Record"
+components:
+  schemas:
+    Record:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date
+        website:
+          type: string
+          format: uri
+        ipAddress:
+          type: string
+          format: ipv4
+        data:
+          type: string
+          format: binary
+        phone:
+          type: string
+          pattern: "^\\+[1-9]\\d{1,14}$"

@@ -1,0 +1,58 @@
+openapi: "3.0.3"
+info:
+  title: SSE Streaming Test
+  version: "1.0.0"
+paths:
+  /events:
+    get:
+      operationId: streamEvents
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/Event"
+  /chat:
+    post:
+      operationId: chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+      responses:
+        "200":
+          description: Chat response stream
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/ChatEvent"
+components:
+  schemas:
+    Event:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        data:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    ChatEvent:
+      type: object
+      properties:
+        content:
+          type: string
+        done:
+          type: boolean

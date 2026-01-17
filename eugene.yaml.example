@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=https://schemas.kolasiak.pl/eugene-config/latest
+
+# Eugene configuration file
+# Copy this file to eugene.yaml and modify as needed
+
+# Path to the OpenAPI specification file
+spec: ./api/openapi.yaml
+
+# Go package name for generated code
+package: api
+
+# Output directory for generated files
+output-dir: ./internal/api
+
+# What to generate (types, server, client, spec)
+generate:
+  types: true
+  server: true
+  client: true
+  spec: false
+  strict-server: false
+
+# Server framework: echo, chi, or stdlib
+server-framework: echo
+
+# Custom templates directory (optional)
+# templates:
+#   dir: ./custom-templates
+
+# Schemas to exclude from generation
+# exclude-schemas:
+#   - InternalSchema
+#   - DebugSchema
+
+# Generate only for operations with these tags
+# include-tags:
+#   - public
+#   - v1
+
+# Exclude operations with these tags
+# exclude-tags:
+#   - internal
+#   - deprecated
+
+# Type generation options
+types:
+  # Enum generation strategy: const, type, or struct
+  enum-strategy: const
+  # UUID type handling: string, google, or gofrs
+  uuid-package: string
+  # Nullable field strategy: pointer or nullable
+  nullable-strategy: pointer
+
+# Output options
+output-options:
+  # Generate yaml tags alongside json tags
+  enable-yaml-tags: false
+  # Additional initialisms for naming (e.g., GTIN, SKU)
+  # additional-initialisms:
+  #   - GTIN
+  #   - SKU
+
+# Custom import mappings for schema references
+# import-mapping:
+#   ./common.yaml#/components/schemas/Error: github.com/myorg/common/api.Error

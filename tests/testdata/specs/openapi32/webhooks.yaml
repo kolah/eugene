@@ -1,0 +1,68 @@
+openapi: "3.2.0"
+info:
+  title: Webhooks Test
+  version: "1.0.0"
+paths: {}
+webhooks:
+  orderStatusChanged:
+    post:
+      operationId: orderStatusChangedWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusEvent"
+      responses:
+        "200":
+          description: Webhook received
+  userCreated:
+    post:
+      operationId: userCreatedWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserEvent"
+      responses:
+        "200":
+          description: Webhook received
+components:
+  schemas:
+    OrderStatusEvent:
+      type: object
+      required: [eventId, eventType, timestamp, data]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+          const: order.status.changed
+        timestamp:
+          type: string
+          format: date-time
+        data:
+          $ref: "#/components/schemas/OrderData"
+    OrderData:
+      type: object
+      properties:
+        orderId:
+          type: string
+        previousStatus:
+          type: string
+        newStatus:
+          type: string
+    UserEvent:
+      type: object
+      required: [eventId, eventType, userId]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+          const: user.created
+        userId:
+          type: string

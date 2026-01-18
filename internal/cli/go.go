@@ -15,6 +15,7 @@ func NewGoCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "go",
 		Short: "Generate Go code from OpenAPI spec",
+		RunE:  runGoGenerate(""),
 	}
 
 	flags := cmd.PersistentFlags()
@@ -89,7 +90,11 @@ func newGoAllCmd() *cobra.Command {
 
 func runGoGenerate(target string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.Load(cmd, expandTargets(target))
+		var cliTargets []string
+		if target != "" {
+			cliTargets = []string{target}
+		}
+		cfg, err := config.Load(cmd, cliTargets)
 		if err != nil {
 			return err
 		}
@@ -146,9 +151,3 @@ func runGoGenerate(target string) func(cmd *cobra.Command, args []string) error 
 	}
 }
 
-func expandTargets(target string) []string {
-	if target == "all" {
-		return []string{"types", "server", "client", "spec", "strict-server"}
-	}
-	return []string{target}
-}

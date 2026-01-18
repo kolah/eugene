@@ -1,5 +1,5 @@
 {
-  "$id": "https://schemas.kolasiak.pl/eugene-config/v2.0.0",
+  "$id": "https://schemas.kolasiak.pl/eugene-config/v1.0.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Eugene Configuration",
   "description": "Configuration schema for Eugene OpenAPI Interface Kit - oink! 🐷",
@@ -111,6 +111,15 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "targets": {
+          "type": "array",
+          "description": "Code generation targets (types, server, client, spec, strict-server, or all)",
+          "items": {
+            "type": "string",
+            "enum": ["types", "server", "client", "spec", "strict-server", "all"]
+          },
+          "default": ["all"]
         }
       },
       "additionalProperties": false

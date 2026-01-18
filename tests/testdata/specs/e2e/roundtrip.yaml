@@ -1,0 +1,323 @@
+openapi: "3.0.3"
+info:
+  title: E2E Round-trip Test
+  version: "1.0.0"
+paths:
+  /echo/json:
+    post:
+      operationId: echoJSON
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EchoPayload"
+      responses:
+        "200":
+          description: Echo response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EchoPayload"
+
+  /echo/form:
+    post:
+      operationId: echoForm
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                field1:
+                  type: string
+                field2:
+                  type: integer
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Echo response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormEchoResponse"
+
+  /echo/multipart:
+    post:
+      operationId: echoMultipart
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                description:
+                  type: string
+      responses:
+        "200":
+          description: Echo response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileEchoResponse"
+
+  /items/{id}:
+    get:
+      operationId: getItem
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filter
+          in: query
+          schema:
+            type: string
+        - name: X-Request-ID
+          in: header
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Item with params
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemWithParams"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /resources:
+    post:
+      operationId: createResource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewResource"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
+
+  /resources/{id}:
+    delete:
+      operationId: deleteResource
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /session:
+    get:
+      operationId: getSession
+      parameters:
+        - name: session_id
+          in: cookie
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionInfo"
+
+  /secure/data:
+    get:
+      operationId: getSecureData
+      security:
+        - apiKey: []
+      responses:
+        "200":
+          description: Secure data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecureData"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /shapes:
+    post:
+      operationId: createShape
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Shape"
+      responses:
+        "200":
+          description: Created shape
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shape"
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    EchoPayload:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        number:
+          type: integer
+        nested:
+          type: object
+          properties:
+            value:
+              type: string
+
+    FormEchoResponse:
+      type: object
+      properties:
+        receivedField1:
+          type: string
+        receivedField2:
+          type: integer
+        receivedTags:
+          type: array
+          items:
+            type: string
+
+    FileEchoResponse:
+      type: object
+      properties:
+        filename:
+          type: string
+        size:
+          type: integer
+        description:
+          type: string
+
+    ItemWithParams:
+      type: object
+      properties:
+        id:
+          type: string
+        filter:
+          type: string
+        requestId:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    Status:
+      type: string
+      enum: [pending, active, completed]
+
+    NewResource:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+        description:
+          type: string
+          nullable: true
+
+    Resource:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/Status"
+        description:
+          type: string
+          nullable: true
+
+    SessionInfo:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        userId:
+          type: string
+        expiresAt:
+          type: string
+
+    SecureData:
+      type: object
+      properties:
+        secret:
+          type: string
+        accessLevel:
+          type: string
+
+    Shape:
+      oneOf:
+        - $ref: "#/components/schemas/Circle"
+        - $ref: "#/components/schemas/Rectangle"
+      discriminator:
+        propertyName: type
+        mapping:
+          circle: "#/components/schemas/Circle"
+          rectangle: "#/components/schemas/Rectangle"
+
+    Circle:
+      type: object
+      required: [type, radius]
+      properties:
+        type:
+          type: string
+        radius:
+          type: number
+
+    Rectangle:
+      type: object
+      required: [type, width, height]
+      properties:
+        type:
+          type: string
+        width:
+          type: number
+        height:
+          type: number

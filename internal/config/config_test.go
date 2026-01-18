@@ -365,7 +365,9 @@ func TestBuildFlagsMap(t *testing.T) {
 
 func TestHasTarget(t *testing.T) {
 	cfg := &Config{
-		Targets: []string{"types", "server"},
+		Go: GoConfig{
+			Targets: []string{"types", "server"},
+		},
 	}
 
 	require.True(t, cfg.HasTarget("types"))

@@ -19,9 +19,6 @@ type Config struct {
 	IncludeTags    []string       `koanf:"include-tags"`
 	ExcludeTags    []string       `koanf:"exclude-tags"`
 	Go             GoConfig       `koanf:"go"`
-
-	// Runtime (not from config file) - set by CLI sub-command
-	Targets []string `koanf:"-"`
 }
 
 type GoConfig struct {
@@ -31,6 +28,7 @@ type GoConfig struct {
 	Types           TypesConfig       `koanf:"types"`
 	OutputOptions   OutputOptions     `koanf:"output-options"`
 	ImportMapping   map[string]string `koanf:"import-mapping"`
+	Targets         []string          `koanf:"targets"`
 }
 
 type TemplateConfig struct {
@@ -92,13 +90,31 @@ func Load(cmd *cobra.Command, targets []string) (*Config, error) {
 		return nil, fmt.Errorf("unmarshaling config: %w", err)
 	}
 
-	cfg.Targets = targets
+	// CLI targets override config file targets
+	if len(targets) > 0 {
+		cfg.Go.Targets = targets
+	}
+
+	// Expand "all" target
+	cfg.Go.Targets = expandTargets(cfg.Go.Targets)
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
 	return &cfg, nil
+}
+
+func expandTargets(targets []string) []string {
+	var result []string
+	for _, t := range targets {
+		if t == "all" {
+			result = append(result, "types", "server", "client", "spec", "strict-server")
+		} else {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 func buildFlagsMap(cmd *cobra.Command) map[string]any {
@@ -214,10 +230,20 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid nullable strategy: %s (valid: pointer, nullable)", c.Go.Types.NullableStrategy)
 	}
 
+	validTargets := map[string]bool{
+		"types": true, "server": true, "client": true,
+		"spec": true, "strict-server": true,
+	}
+	for _, t := range c.Go.Targets {
+		if !validTargets[t] {
+			return fmt.Errorf("invalid target: %s (valid: types, server, client, spec, strict-server)", t)
+		}
+	}
+
 	return nil
 }
 
 // HasTarget checks if a specific target should be generated
 func (c *Config) HasTarget(target string) bool {
-	return slices.Contains(c.Targets, target)
+	return slices.Contains(c.Go.Targets, target)
 }

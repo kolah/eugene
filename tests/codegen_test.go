@@ -246,6 +246,38 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 			outputDir:       "generated/callbacks",
 			specFile:        "testdata/specs/openapi32/callbacks.yaml",
 		},
+		// E2E tests - basic server
+		{
+			name:            "e2e_echo",
+			targets:         []string{"types", "server", "client"},
+			serverFramework: "echo",
+			outputDir:       "generated/e2e_echo",
+			specFile:        "testdata/specs/e2e/roundtrip.yaml",
+		},
+		// E2E tests - strict server
+		{
+			name:            "e2e_strict_echo",
+			targets:         []string{"types", "strict-server", "client"},
+			serverFramework: "echo",
+			outputDir:       "generated/e2e_strict_echo",
+			specFile:        "testdata/specs/e2e/roundtrip.yaml",
+		},
+		// E2E tests - Chi server
+		{
+			name:            "e2e_chi",
+			targets:         []string{"types", "server", "client"},
+			serverFramework: "chi",
+			outputDir:       "generated/e2e_chi",
+			specFile:        "testdata/specs/e2e/roundtrip.yaml",
+		},
+		// E2E tests - Stdlib server
+		{
+			name:            "e2e_stdlib",
+			targets:         []string{"types", "server", "client"},
+			serverFramework: "stdlib",
+			outputDir:       "generated/e2e_stdlib",
+			specFile:        "testdata/specs/e2e/roundtrip.yaml",
+		},
 	}
 
 	for _, tt := range tests {
@@ -280,12 +312,12 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 			}
 
 			cfg := &config.Config{
-				Spec:    specPath,
-				Targets: tt.targets,
+				Spec: specPath,
 				Go: config.GoConfig{
 					OutputDir:       outputPath,
 					Package:         "gen",
 					ServerFramework: serverFramework,
+					Targets:         tt.targets,
 					Types: config.TypesConfig{
 						EnumStrategy:     tt.enumStrategy,
 						UUIDPackage:      tt.uuidPackage,
@@ -347,10 +379,10 @@ func TestCustomTemplateOverride(t *testing.T) {
 		Templates: config.TemplateConfig{
 			Dir: customTemplatesDir,
 		},
-		Targets: []string{"types"},
 		Go: config.GoConfig{
 			OutputDir: outputPath,
 			Package:   "gen",
+			Targets:   []string{"types"},
 		},
 	}
 

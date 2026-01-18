@@ -7,7 +7,9 @@ type BaseProperties struct {
 }
 
 type Person struct {
+	BaseProperties
 }
 type PersonWithID struct {
+	Person
 	ID string `json:"id"`
 }

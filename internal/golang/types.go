@@ -463,7 +463,7 @@ func (r *TypeResolver) resolveAllOf(s *model.Schema, parentName, fieldName strin
 	r.nestedTypes = append(r.nestedTypes, ResolvedType{
 		Name:    nestedName,
 		Schema:  &resolvedSchema,
-		IsAllOf: allRefs,
+		IsAllOf: len(resolvedSchema.AllOf) > 0,
 	})
 
 	return nestedName
@@ -478,12 +478,11 @@ func (r *TypeResolver) mergeAllOfSchemas(schemas []*model.Schema, parentName str
 
 	for _, s := range schemas {
 		if s.Ref != "" {
-			// For refs, we'll use embedding, don't merge properties
+			merged.AllOf = append(merged.AllOf, s)
 			continue
 		}
 
 		for _, prop := range s.Properties {
-			// Resolve nested types in properties
 			r.ResolveType(prop.Schema, parentName, prop.Name)
 			merged.Properties = append(merged.Properties, prop)
 		}

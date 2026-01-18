@@ -1,4 +1,4 @@
-# Eugene - OpenAPI Code Generator for Go
+# Eugene - OpenAPI INterface Kit - oink! 🐷
 
 Eugene is a CLI tool for generating Go code from OpenAPI specifications (3.0, 3.1, 3.2). It generates type-safe clients, servers, and type definitions from your API specs.
 

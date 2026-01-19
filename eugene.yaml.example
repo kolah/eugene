@@ -1,27 +1,7 @@
 # yaml-language-server: $schema=https://schemas.kolasiak.pl/eugene-config/latest
 
-# Eugene configuration file
-# Copy this file to eugene.yaml and modify as needed
-
 # Path to the OpenAPI specification file
 spec: ./api/openapi.yaml
-
-# Go package name for generated code
-package: api
-
-# Output directory for generated files
-output-dir: ./internal/api
-
-# What to generate (types, server, client, spec)
-generate:
-  types: true
-  server: true
-  client: true
-  spec: false
-  strict-server: false
-
-# Server framework: echo, chi, or stdlib
-server-framework: echo
 
 # Custom templates directory (optional)
 # templates:
@@ -42,24 +22,42 @@ server-framework: echo
 #   - internal
 #   - deprecated
 
-# Type generation options
-types:
-  # Enum generation strategy: const, type, or struct
-  enum-strategy: const
-  # UUID type handling: string, google, or gofrs
-  uuid-package: string
-  # Nullable field strategy: pointer or nullable
-  nullable-strategy: pointer
+# Go code generation settings
+go:
+  # Go package name for generated code
+  package: api
 
-# Output options
-output-options:
-  # Generate yaml tags alongside json tags
-  enable-yaml-tags: false
-  # Additional initialisms for naming (e.g., GTIN, SKU)
-  # additional-initialisms:
-  #   - GTIN
-  #   - SKU
+  # Output directory for generated files
+  output-dir: ./internal/api
 
-# Custom import mappings for schema references
-# import-mapping:
-#   ./common.yaml#/components/schemas/Error: github.com/myorg/common/api.Error
+  # What to generate (types, server, client, spec, strict-server)
+  # Can also use CLI subcommands: eugene generate go types
+  targets:
+    - types
+    - server
+    - client
+
+  # Server framework: echo, chi, or stdlib
+  server-framework: echo
+
+  # Type generation options
+  types:
+    # Enum generation strategy: const, type, or struct
+    enum-strategy: const
+    # UUID type handling: string, google, or gofrs
+    uuid-package: string
+    # Nullable field strategy: pointer or nullable
+    nullable-strategy: pointer
+
+  # Output options
+  output-options:
+    # Generate yaml tags alongside json tags
+    enable-yaml-tags: false
+    # Additional initialisms for naming (e.g., GTIN, SKU)
+    # additional-initialisms:
+    #   - GTIN
+    #   - SKU
+
+  # Custom import mappings for schema references
+  # import-mapping:
+  #   "#/components/schemas/Error": github.com/myorg/common/api

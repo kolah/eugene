@@ -14,41 +14,59 @@ go install github.com/kolah/eugene/cmd/eugene@latest
 
 ```yaml
 spec: ./api/openapi.yaml
-package: api
-output-dir: ./gen
 
-generate:
-  types: true
-  server: true
-  client: true
+go:
+  package: api
+  output-dir: ./gen
+  targets:
+    - types
+    - server
+    - client
 ```
 
 2. Run the generator:
 
 ```bash
-eugene generate
+eugene generate go
+```
+
+Or generate specific targets:
+
+```bash
+eugene generate go types
+eugene generate go server
+eugene generate go all
 ```
 
 ## CLI Usage
 
 ```
-eugene generate [flags]
+eugene generate go [target] [flags]
 
-Flags:
+Targets:
+  types          Generate Go type definitions
+  server         Generate Go server code
+  strict-server  Generate Go strict server with typed responses
+  client         Generate Go HTTP client
+  spec           Generate embedded OpenAPI spec
+  all            Generate all targets
+
+Common Flags:
   -c, --config string              Config file (default: eugene.yaml)
   -s, --spec string                OpenAPI spec path
-  -o, --output-dir string          Output directory
-  -p, --package string             Go package name
-  -g, --generate strings           What to generate: types,server,strict-server,client,spec
-  -f, --server-framework string    Server framework: echo, chi, stdlib (default "echo")
       --templates string           Custom templates directory
       --exclude-schemas strings    Schemas to exclude
       --include-tags strings       Tags to include (exclusive)
       --exclude-tags strings       Tags to exclude
       --dry-run                    Print output without writing files
-      --enum-strategy string       Enum strategy: const, type, struct (default "const")
-      --uuid-package string        UUID type: string, google, gofrs (default "string")
-      --nullable-strategy string   Nullable strategy: pointer, nullable (default "pointer")
+
+Go Flags:
+  -o, --output-dir string          Output directory
+  -p, --package string             Go package name
+  -f, --server-framework string    Server framework: echo, chi, stdlib
+      --enum-strategy string       Enum strategy: const, type, struct
+      --uuid-package string        UUID type: string, google, gofrs
+      --nullable-strategy string   Nullable strategy: pointer, nullable
       --enable-yaml-tags           Generate yaml tags alongside json tags
       --additional-initialisms     Custom initialisms for naming (e.g., GTIN,SKU)
 ```
@@ -61,31 +79,9 @@ Eugene supports configuration via YAML file, CLI flags, and environment variable
 
 ```yaml
 spec: api/openapi.yaml
-package: api
-output-dir: ./gen
 
-generate:
-  types: true
-  server: true
-  strict-server: true
-  client: true
-  spec: true
-
-server-framework: echo
-
-types:
-  enum-strategy: const      # const, type, or struct
-  uuid-package: google      # string, google, or gofrs
-  nullable-strategy: pointer # pointer or nullable
-
-output-options:
-  enable-yaml-tags: true
-  additional-initialisms:
-    - GTIN
-    - SKU
-
-import-mapping:
-  "#/components/schemas/Error": github.com/myorg/api/common
+templates:
+  dir: ./custom-templates
 
 exclude-schemas:
   - InternalType
@@ -93,8 +89,31 @@ exclude-schemas:
 include-tags:
   - public
 
-templates:
-  dir: ./custom-templates
+go:
+  package: api
+  output-dir: ./gen
+  server-framework: echo
+
+  targets:
+    - types
+    - server
+    - strict-server
+    - client
+    - spec
+
+  types:
+    enum-strategy: const      # const, type, or struct
+    uuid-package: google      # string, google, or gofrs
+    nullable-strategy: pointer # pointer or nullable
+
+  output-options:
+    enable-yaml-tags: true
+    additional-initialisms:
+      - GTIN
+      - SKU
+
+  import-mapping:
+    "#/components/schemas/Error": github.com/myorg/api/common
 ```
 
 ## Generated Code
@@ -318,7 +337,7 @@ eugene/
 |---------|---------|
 | OpenAPI Parsing | `pb33f/libopenapi` |
 | CLI | `spf13/cobra` |
-| Config | `spf13/viper` |
+| Config | `knadh/koanf` |
 | Formatting | `golang.org/x/tools/imports` |
 
 ## Testing

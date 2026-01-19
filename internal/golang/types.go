@@ -229,12 +229,6 @@ func packageName(importPath string) string {
 	return importPath
 }
 
-// Reset clears collected nested types for reuse.
-func (r *TypeResolver) Reset() {
-	r.nestedTypes = nil
-	r.seen = make(map[string]bool)
-}
-
 // ResolveType resolves a schema to a Go type name, collecting nested types as needed.
 func (r *TypeResolver) ResolveType(s *model.Schema, parentName, fieldName string) string {
 	if s == nil {

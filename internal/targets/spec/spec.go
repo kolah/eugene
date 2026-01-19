@@ -12,10 +12,6 @@ func New() *Target {
 	return &Target{}
 }
 
-func (t *Target) Name() string {
-	return "spec"
-}
-
 type templateData struct {
 	Package  string
 	SpecData string

@@ -2,7 +2,6 @@ package strictserver
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/kolah/eugene/internal/golang"
@@ -34,14 +33,6 @@ func New(frameworkName string) (*Target, error) {
 		return nil, fmt.Errorf("unsupported server framework: %s", frameworkName)
 	}
 	return &Target{framework: fw}, nil
-}
-
-func (t *Target) Name() string {
-	return "strict-server"
-}
-
-func (t *Target) FrameworkName() string {
-	return t.framework.Name()
 }
 
 type templateData struct {
@@ -210,18 +201,6 @@ func splitRef(ref string) []string {
 		parts = append(parts, current)
 	}
 	return parts
-}
-
-// statusCodeInt converts a status code string to int for template use
-func StatusCodeInt(code string) int {
-	if code == "default" {
-		return 500
-	}
-	n, err := strconv.Atoi(code)
-	if err != nil {
-		return 500
-	}
-	return n
 }
 
 // Echo Framework

@@ -205,19 +205,3 @@ func TestTypeResolver_AllOf(t *testing.T) {
 	require.True(t, nested[0].IsAllOf)
 }
 
-func TestTypeResolver_Reset(t *testing.T) {
-	r := NewTypeResolver(&config.TypesConfig{})
-
-	schema := &model.Schema{
-		Type: model.TypeObject,
-		Properties: []model.Property{
-			{Name: "name", Schema: &model.Schema{Type: model.TypeString}},
-		},
-	}
-
-	r.ResolveType(schema, "User", "Preferences")
-	require.Len(t, r.NestedTypes(), 1)
-
-	r.Reset()
-	require.Empty(t, r.NestedTypes())
-}

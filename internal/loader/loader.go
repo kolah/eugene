@@ -2,7 +2,6 @@ package loader
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,18 +35,6 @@ func LoadFile(path string) (*Result, error) {
 	}
 
 	return loadWithConfig(data, config)
-}
-
-func LoadReader(r io.Reader) (*Result, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("reading spec: %w", err)
-	}
-	return Load(data)
-}
-
-func Load(data []byte) (*Result, error) {
-	return loadWithConfig(data, nil)
 }
 
 func loadWithConfig(data []byte, config *datamodel.DocumentConfiguration) (*Result, error) {

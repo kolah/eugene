@@ -32,14 +32,6 @@ func New(frameworkName string) (*Target, error) {
 	return &Target{framework: fw}, nil
 }
 
-func (t *Target) Name() string {
-	return "server"
-}
-
-func (t *Target) FrameworkName() string {
-	return t.framework.Name()
-}
-
 type serverFeatures struct {
 	HasStreaming      bool // any operation uses SSE
 	HasQueryString    bool // any operation uses querystring param (OpenAPI 3.2)

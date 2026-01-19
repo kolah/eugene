@@ -13,10 +13,6 @@ func New() *Target {
 	return &Target{}
 }
 
-func (t *Target) Name() string {
-	return "types"
-}
-
 type templateData struct {
 	Package          string
 	Schemas          []model.Schema

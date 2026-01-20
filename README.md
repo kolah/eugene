@@ -2,10 +2,20 @@
 
 Eugene is a CLI tool for generating Go code from OpenAPI specifications (3.0, 3.1, 3.2). It generates type-safe clients, servers, and type definitions from your API specs.
 
+This project is heavily inspired by [oapi-codegen/oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) and is an attempt to bring newest OpenAPI specifications while offering similar code generation experience.
+
+Underneath, the tool is built upon [pb33f/libopenapi](https://github.com/pb33f/libopenapi) that made creating this tool possible.
+
 ## Installation
 
 ```bash
 go install github.com/kolah/eugene/cmd/eugene@latest
+```
+
+or use it as a tool dependency:
+
+```bash
+go get -tool github.com/kolah/eugene/cmd/eugene@latest
 ```
 
 ## Quick Start

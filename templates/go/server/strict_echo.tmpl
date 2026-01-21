@@ -86,26 +86,25 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 }
 {{ end }}
 // RegisterStrictHandlers registers all strict handlers with the Echo instance.
-func RegisterStrictHandlers(e *echo.Echo, ssi StrictServerInterface) {
+func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	h := NewStrictHandler(ssi)
 {{ range .Operations }}
 {{- if eq .Method "QUERY" }}
-	e.Match([]string{"QUERY"}, "{{ .FramePath }}", h.{{ .ID }})
+	router.Match([]string{"QUERY"}, "{{ .FramePath }}", h.{{ .ID }})
 {{- else }}
-	e.{{ .Method }}("{{ .FramePath }}", h.{{ .ID }})
+	router.{{ .Method }}("{{ .FramePath }}", h.{{ .ID }})
 {{- end }}
 {{- end }}
 }
 
 // RegisterStrictHandlersWithBaseURL registers all strict handlers with a base URL.
-func RegisterStrictHandlersWithBaseURL(e *echo.Echo, ssi StrictServerInterface, baseURL string) {
+func RegisterStrictHandlersWithBaseURL(router Router, ssi StrictServerInterface, baseURL string) {
 	h := NewStrictHandler(ssi)
-	g := e.Group(baseURL)
 {{ range .Operations }}
 {{- if eq .Method "QUERY" }}
-	g.Match([]string{"QUERY"}, "{{ .FramePath }}", h.{{ .ID }})
+	router.Match([]string{"QUERY"}, baseURL+"{{ .FramePath }}", h.{{ .ID }})
 {{- else }}
-	g.{{ .Method }}("{{ .FramePath }}", h.{{ .ID }})
+	router.{{ .Method }}(baseURL+"{{ .FramePath }}", h.{{ .ID }})
 {{- end }}
 {{- end }}
 }

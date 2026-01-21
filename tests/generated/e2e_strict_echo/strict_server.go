@@ -157,32 +157,31 @@ func (h *StrictEchoHandler) CreateShape(ctx echo.Context) error {
 }
 
 // RegisterStrictHandlers registers all strict handlers with the Echo instance.
-func RegisterStrictHandlers(e *echo.Echo, ssi StrictServerInterface) {
+func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	h := NewStrictHandler(ssi)
 
-	e.POST("/echo/json", h.EchoJSON)
-	e.POST("/echo/form", h.EchoForm)
-	e.POST("/echo/multipart", h.EchoMultipart)
-	e.GET("/items/:id", h.GetItem)
-	e.POST("/resources", h.CreateResource)
-	e.DELETE("/resources/:id", h.DeleteResource)
-	e.GET("/session", h.GetSession)
-	e.GET("/secure/data", h.GetSecureData)
-	e.POST("/shapes", h.CreateShape)
+	router.POST("/echo/json", h.EchoJSON)
+	router.POST("/echo/form", h.EchoForm)
+	router.POST("/echo/multipart", h.EchoMultipart)
+	router.GET("/items/:id", h.GetItem)
+	router.POST("/resources", h.CreateResource)
+	router.DELETE("/resources/:id", h.DeleteResource)
+	router.GET("/session", h.GetSession)
+	router.GET("/secure/data", h.GetSecureData)
+	router.POST("/shapes", h.CreateShape)
 }
 
 // RegisterStrictHandlersWithBaseURL registers all strict handlers with a base URL.
-func RegisterStrictHandlersWithBaseURL(e *echo.Echo, ssi StrictServerInterface, baseURL string) {
+func RegisterStrictHandlersWithBaseURL(router Router, ssi StrictServerInterface, baseURL string) {
 	h := NewStrictHandler(ssi)
-	g := e.Group(baseURL)
 
-	g.POST("/echo/json", h.EchoJSON)
-	g.POST("/echo/form", h.EchoForm)
-	g.POST("/echo/multipart", h.EchoMultipart)
-	g.GET("/items/:id", h.GetItem)
-	g.POST("/resources", h.CreateResource)
-	g.DELETE("/resources/:id", h.DeleteResource)
-	g.GET("/session", h.GetSession)
-	g.GET("/secure/data", h.GetSecureData)
-	g.POST("/shapes", h.CreateShape)
+	router.POST(baseURL+"/echo/json", h.EchoJSON)
+	router.POST(baseURL+"/echo/form", h.EchoForm)
+	router.POST(baseURL+"/echo/multipart", h.EchoMultipart)
+	router.GET(baseURL+"/items/:id", h.GetItem)
+	router.POST(baseURL+"/resources", h.CreateResource)
+	router.DELETE(baseURL+"/resources/:id", h.DeleteResource)
+	router.GET(baseURL+"/session", h.GetSession)
+	router.GET(baseURL+"/secure/data", h.GetSecureData)
+	router.POST(baseURL+"/shapes", h.CreateShape)
 }

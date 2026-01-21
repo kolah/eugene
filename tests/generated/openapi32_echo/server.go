@@ -100,25 +100,24 @@ func (w *ServerInterfaceWrapper) AdvancedSearch(ctx echo.Context) error {
 	return w.Handler.AdvancedSearch(ctx, &query)
 }
 
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
-	e.Match([]string{"QUERY"}, "/search", wrapper.SearchItems)
-	e.GET("/events", wrapper.StreamEvents)
-	e.GET("/items", wrapper.ListItems)
-	e.GET("/stream/sse", wrapper.StreamSse)
-	e.GET("/stream/jsonl", wrapper.StreamJsonl)
-	e.GET("/advanced-search", wrapper.AdvancedSearch)
+	router.Match([]string{"QUERY"}, "/search", wrapper.SearchItems)
+	router.GET("/events", wrapper.StreamEvents)
+	router.GET("/items", wrapper.ListItems)
+	router.GET("/stream/sse", wrapper.StreamSse)
+	router.GET("/stream/jsonl", wrapper.StreamJsonl)
+	router.GET("/advanced-search", wrapper.AdvancedSearch)
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 
-	g.Match([]string{"QUERY"}, "/search", wrapper.SearchItems)
-	g.GET("/events", wrapper.StreamEvents)
-	g.GET("/items", wrapper.ListItems)
-	g.GET("/stream/sse", wrapper.StreamSse)
-	g.GET("/stream/jsonl", wrapper.StreamJsonl)
-	g.GET("/advanced-search", wrapper.AdvancedSearch)
+	router.Match([]string{"QUERY"}, baseURL+"/search", wrapper.SearchItems)
+	router.GET(baseURL+"/events", wrapper.StreamEvents)
+	router.GET(baseURL+"/items", wrapper.ListItems)
+	router.GET(baseURL+"/stream/sse", wrapper.StreamSse)
+	router.GET(baseURL+"/stream/jsonl", wrapper.StreamJsonl)
+	router.GET(baseURL+"/advanced-search", wrapper.AdvancedSearch)
 }

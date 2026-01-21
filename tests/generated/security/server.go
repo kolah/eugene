@@ -36,21 +36,20 @@ func (w *ServerInterfaceWrapper) APIEndpoint(ctx echo.Context) error {
 	return w.Handler.APIEndpoint(ctx)
 }
 
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
-	e.GET("/public", wrapper.PublicEndpoint)
-	e.GET("/protected", wrapper.ProtectedEndpoint)
-	e.GET("/admin", wrapper.AdminEndpoint)
-	e.GET("/api", wrapper.APIEndpoint)
+	router.GET("/public", wrapper.PublicEndpoint)
+	router.GET("/protected", wrapper.ProtectedEndpoint)
+	router.GET("/admin", wrapper.AdminEndpoint)
+	router.GET("/api", wrapper.APIEndpoint)
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 
-	g.GET("/public", wrapper.PublicEndpoint)
-	g.GET("/protected", wrapper.ProtectedEndpoint)
-	g.GET("/admin", wrapper.AdminEndpoint)
-	g.GET("/api", wrapper.APIEndpoint)
+	router.GET(baseURL+"/public", wrapper.PublicEndpoint)
+	router.GET(baseURL+"/protected", wrapper.ProtectedEndpoint)
+	router.GET(baseURL+"/admin", wrapper.AdminEndpoint)
+	router.GET(baseURL+"/api", wrapper.APIEndpoint)
 }

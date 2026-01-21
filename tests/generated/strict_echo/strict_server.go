@@ -92,24 +92,23 @@ func (h *StrictEchoHandler) DeleteItem(ctx echo.Context) error {
 }
 
 // RegisterStrictHandlers registers all strict handlers with the Echo instance.
-func RegisterStrictHandlers(e *echo.Echo, ssi StrictServerInterface) {
+func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	h := NewStrictHandler(ssi)
 
-	e.GET("/items", h.ListItems)
-	e.POST("/items", h.CreateItem)
-	e.GET("/items/:id", h.GetItem)
-	e.PUT("/items/:id", h.UpdateItem)
-	e.DELETE("/items/:id", h.DeleteItem)
+	router.GET("/items", h.ListItems)
+	router.POST("/items", h.CreateItem)
+	router.GET("/items/:id", h.GetItem)
+	router.PUT("/items/:id", h.UpdateItem)
+	router.DELETE("/items/:id", h.DeleteItem)
 }
 
 // RegisterStrictHandlersWithBaseURL registers all strict handlers with a base URL.
-func RegisterStrictHandlersWithBaseURL(e *echo.Echo, ssi StrictServerInterface, baseURL string) {
+func RegisterStrictHandlersWithBaseURL(router Router, ssi StrictServerInterface, baseURL string) {
 	h := NewStrictHandler(ssi)
-	g := e.Group(baseURL)
 
-	g.GET("/items", h.ListItems)
-	g.POST("/items", h.CreateItem)
-	g.GET("/items/:id", h.GetItem)
-	g.PUT("/items/:id", h.UpdateItem)
-	g.DELETE("/items/:id", h.DeleteItem)
+	router.GET(baseURL+"/items", h.ListItems)
+	router.POST(baseURL+"/items", h.CreateItem)
+	router.GET(baseURL+"/items/:id", h.GetItem)
+	router.PUT(baseURL+"/items/:id", h.UpdateItem)
+	router.DELETE(baseURL+"/items/:id", h.DeleteItem)
 }

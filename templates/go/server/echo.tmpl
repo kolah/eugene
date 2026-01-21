@@ -146,25 +146,24 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 	return w.Handler.{{ .ID | pascalCase }}(ctx{{ range .Parameters }}{{ if eq .In "path" }}, {{ .GoName | lower }}{{ end }}{{ end }}{{ if .HasQueryString }}, &{{ .QueryString.GoName | lower }}{{ end }}{{ if .IsMultipart }}, req{{ end }}{{ if .IsFormUrlEncoded }}, req{{ end }})
 }
 {{ end }}
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 {{ range .Operations }}
 {{- if eq .Method "QUERY" }}
-	e.Match([]string{"QUERY"}, "{{ .FramePath }}", wrapper.{{ .ID | pascalCase }})
+	router.Match([]string{"QUERY"}, "{{ .FramePath }}", wrapper.{{ .ID | pascalCase }})
 {{- else }}
-	e.{{ .Method }}("{{ .FramePath }}", wrapper.{{ .ID | pascalCase }})
+	router.{{ .Method }}("{{ .FramePath }}", wrapper.{{ .ID | pascalCase }})
 {{- end }}
 {{- end }}
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 {{ range .Operations }}
 {{- if eq .Method "QUERY" }}
-	g.Match([]string{"QUERY"}, "{{ .FramePath }}", wrapper.{{ .ID | pascalCase }})
+	router.Match([]string{"QUERY"}, baseURL+"{{ .FramePath }}", wrapper.{{ .ID | pascalCase }})
 {{- else }}
-	g.{{ .Method }}("{{ .FramePath }}", wrapper.{{ .ID | pascalCase }})
+	router.{{ .Method }}(baseURL+"{{ .FramePath }}", wrapper.{{ .ID | pascalCase }})
 {{- end }}
 {{- end }}
 }
@@ -187,12 +186,11 @@ func (w *CallbackServerInterfaceWrapper) {{ .GoName }}(ctx echo.Context) error {
 	return w.Handler.{{ .GoName }}(ctx)
 }
 {{ end }}
-func RegisterCallbackHandlers(e *echo.Echo, si CallbackServerInterface, basePath string) {
+func RegisterCallbackHandlers(router Router, si CallbackServerInterface, basePath string) {
 	wrapper := &CallbackServerInterfaceWrapper{Handler: si}
-	g := e.Group(basePath)
 {{- range $cb := .Callbacks }}
 {{- range .Operations }}
-	g.{{ .Method }}("", wrapper.{{ $cb.GoName }})
+	router.{{ .Method }}(basePath, wrapper.{{ $cb.GoName }})
 {{- end }}
 {{- end }}
 }

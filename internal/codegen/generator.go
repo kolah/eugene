@@ -44,6 +44,22 @@ func New(cfg *config.Config) (*Generator, error) {
 func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error) {
 	var outputs []Output
 
+	// Generate router.go for Echo when server or strict-server is present
+	if g.config.Go.ServerFramework == "echo" && (g.config.HasTarget("server") || g.config.HasTarget("strict-server")) {
+		content, err := g.engine.Execute("go/server/echo_router.tmpl", map[string]string{"Package": g.config.Go.Package})
+		if err != nil {
+			return nil, fmt.Errorf("generating router: %w", err)
+		}
+		formatted, err := golang.Format([]byte(content))
+		if err != nil {
+			return nil, fmt.Errorf("formatting router: %w", err)
+		}
+		outputs = append(outputs, Output{
+			Filename: "router.go",
+			Content:  string(formatted),
+		})
+	}
+
 	if g.config.HasTarget("types") {
 		target := types.New()
 		content, err := target.Generate(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, &g.config.Go.OutputOptions, g.config.Go.ImportMapping)

@@ -42,23 +42,22 @@ func (w *ServerInterfaceWrapper) DeleteItem(ctx echo.Context) error {
 	return w.Handler.DeleteItem(ctx)
 }
 
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
-	e.GET("/items", wrapper.ListItems)
-	e.POST("/items", wrapper.CreateItem)
-	e.GET("/items/:id", wrapper.GetItem)
-	e.PUT("/items/:id", wrapper.UpdateItem)
-	e.DELETE("/items/:id", wrapper.DeleteItem)
+	router.GET("/items", wrapper.ListItems)
+	router.POST("/items", wrapper.CreateItem)
+	router.GET("/items/:id", wrapper.GetItem)
+	router.PUT("/items/:id", wrapper.UpdateItem)
+	router.DELETE("/items/:id", wrapper.DeleteItem)
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 
-	g.GET("/items", wrapper.ListItems)
-	g.POST("/items", wrapper.CreateItem)
-	g.GET("/items/:id", wrapper.GetItem)
-	g.PUT("/items/:id", wrapper.UpdateItem)
-	g.DELETE("/items/:id", wrapper.DeleteItem)
+	router.GET(baseURL+"/items", wrapper.ListItems)
+	router.POST(baseURL+"/items", wrapper.CreateItem)
+	router.GET(baseURL+"/items/:id", wrapper.GetItem)
+	router.PUT(baseURL+"/items/:id", wrapper.UpdateItem)
+	router.DELETE(baseURL+"/items/:id", wrapper.DeleteItem)
 }

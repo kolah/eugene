@@ -359,34 +359,6 @@ cd tests
 go test ./...
 ```
 
-To update golden files:
-
-```bash
-go test ./... -update
-```
-
-### Test Structure
-
-```
-tests/
-├── go.mod              # Separate module with test dependencies
-├── codegen_test.go     # Code generation pipeline tests
-├── compile_test.go     # Compilation verification tests
-├── server_test.go      # HTTP server behavior tests
-├── sse_test.go         # Server-Sent Events tests
-├── generated/          # Generated code for compilation tests
-└── golden/             # Expected output files
-```
-
-### Test Categories
-
-| Test File | Purpose |
-|-----------|---------|
-| `compile_test.go` | Verifies generated code compiles for all targets |
-| `server_test.go` | Tests HTTP routing, path/query parameter handling |
-| `sse_test.go` | Tests Server-Sent Events streaming |
-| `codegen_test.go` | Verifies custom template overrides |
-
 ## License
 
 MIT

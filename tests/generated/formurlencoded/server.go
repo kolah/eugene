@@ -35,15 +35,14 @@ func (w *ServerInterfaceWrapper) Login(ctx echo.Context) error {
 	return w.Handler.Login(ctx, req)
 }
 
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
-	e.POST("/login", wrapper.Login)
+	router.POST("/login", wrapper.Login)
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 
-	g.POST("/login", wrapper.Login)
+	router.POST(baseURL+"/login", wrapper.Login)
 }

@@ -38,15 +38,14 @@ func (w *ServerInterfaceWrapper) UploadFile(ctx echo.Context) error {
 	return w.Handler.UploadFile(ctx, req)
 }
 
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
-	e.POST("/upload", wrapper.UploadFile)
+	router.POST("/upload", wrapper.UploadFile)
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 
-	g.POST("/upload", wrapper.UploadFile)
+	router.POST(baseURL+"/upload", wrapper.UploadFile)
 }

@@ -97,31 +97,30 @@ func (w *ServerInterfaceWrapper) CreateShape(ctx echo.Context) error {
 	return w.Handler.CreateShape(ctx)
 }
 
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
-	e.POST("/echo/json", wrapper.EchoJSON)
-	e.POST("/echo/form", wrapper.EchoForm)
-	e.POST("/echo/multipart", wrapper.EchoMultipart)
-	e.GET("/items/:id", wrapper.GetItem)
-	e.POST("/resources", wrapper.CreateResource)
-	e.DELETE("/resources/:id", wrapper.DeleteResource)
-	e.GET("/session", wrapper.GetSession)
-	e.GET("/secure/data", wrapper.GetSecureData)
-	e.POST("/shapes", wrapper.CreateShape)
+	router.POST("/echo/json", wrapper.EchoJSON)
+	router.POST("/echo/form", wrapper.EchoForm)
+	router.POST("/echo/multipart", wrapper.EchoMultipart)
+	router.GET("/items/:id", wrapper.GetItem)
+	router.POST("/resources", wrapper.CreateResource)
+	router.DELETE("/resources/:id", wrapper.DeleteResource)
+	router.GET("/session", wrapper.GetSession)
+	router.GET("/secure/data", wrapper.GetSecureData)
+	router.POST("/shapes", wrapper.CreateShape)
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 
-	g.POST("/echo/json", wrapper.EchoJSON)
-	g.POST("/echo/form", wrapper.EchoForm)
-	g.POST("/echo/multipart", wrapper.EchoMultipart)
-	g.GET("/items/:id", wrapper.GetItem)
-	g.POST("/resources", wrapper.CreateResource)
-	g.DELETE("/resources/:id", wrapper.DeleteResource)
-	g.GET("/session", wrapper.GetSession)
-	g.GET("/secure/data", wrapper.GetSecureData)
-	g.POST("/shapes", wrapper.CreateShape)
+	router.POST(baseURL+"/echo/json", wrapper.EchoJSON)
+	router.POST(baseURL+"/echo/form", wrapper.EchoForm)
+	router.POST(baseURL+"/echo/multipart", wrapper.EchoMultipart)
+	router.GET(baseURL+"/items/:id", wrapper.GetItem)
+	router.POST(baseURL+"/resources", wrapper.CreateResource)
+	router.DELETE(baseURL+"/resources/:id", wrapper.DeleteResource)
+	router.GET(baseURL+"/session", wrapper.GetSession)
+	router.GET(baseURL+"/secure/data", wrapper.GetSecureData)
+	router.POST(baseURL+"/shapes", wrapper.CreateShape)
 }

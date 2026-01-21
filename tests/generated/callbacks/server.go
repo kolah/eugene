@@ -24,17 +24,16 @@ func (w *ServerInterfaceWrapper) CreateOrder(ctx echo.Context) error {
 	return w.Handler.CreateOrder(ctx)
 }
 
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
-	e.POST("/orders", wrapper.CreateOrder)
+	router.POST("/orders", wrapper.CreateOrder)
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 
-	g.POST("/orders", wrapper.CreateOrder)
+	router.POST(baseURL+"/orders", wrapper.CreateOrder)
 }
 
 // CallbackServerInterface handles incoming callback requests.
@@ -52,10 +51,9 @@ func (w *CallbackServerInterfaceWrapper) OrderProcessed(ctx echo.Context) error 
 	return w.Handler.OrderProcessed(ctx)
 }
 
-func RegisterCallbackHandlers(e *echo.Echo, si CallbackServerInterface, basePath string) {
+func RegisterCallbackHandlers(router Router, si CallbackServerInterface, basePath string) {
 	wrapper := &CallbackServerInterfaceWrapper{Handler: si}
-	g := e.Group(basePath)
-	g.POST("", wrapper.OrderProcessed)
+	router.POST(basePath, wrapper.OrderProcessed)
 }
 
 // CallbackClient makes outgoing callback HTTP requests.

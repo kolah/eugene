@@ -19,15 +19,14 @@ func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 	return w.Handler.GetItem(ctx, id)
 }
 
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
-	e.GET("/items/:id", wrapper.GetItem)
+	router.GET("/items/:id", wrapper.GetItem)
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 
-	g.GET("/items/:id", wrapper.GetItem)
+	router.GET(baseURL+"/items/:id", wrapper.GetItem)
 }

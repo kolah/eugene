@@ -72,17 +72,16 @@ func (w *ServerInterfaceWrapper) Chat(ctx echo.Context) error {
 	return w.Handler.Chat(ctx)
 }
 
-func RegisterHandlers(e *echo.Echo, si ServerInterface) {
+func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
-	e.GET("/events", wrapper.StreamEvents)
-	e.POST("/chat", wrapper.Chat)
+	router.GET("/events", wrapper.StreamEvents)
+	router.POST("/chat", wrapper.Chat)
 }
 
-func RegisterHandlersWithBaseURL(e *echo.Echo, si ServerInterface, baseURL string) {
+func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
-	g := e.Group(baseURL)
 
-	g.GET("/events", wrapper.StreamEvents)
-	g.POST("/chat", wrapper.Chat)
+	router.GET(baseURL+"/events", wrapper.StreamEvents)
+	router.POST(baseURL+"/chat", wrapper.Chat)
 }

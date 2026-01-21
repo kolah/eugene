@@ -395,7 +395,7 @@ func TestCustomTemplateOverride(t *testing.T) {
 	// Check that custom template marker is present
 	var typesContent string
 	for _, o := range outputs {
-		if o.Filename == "types.go" {
+		if o.Filename == "types.eugene.go" {
 			typesContent = o.Content
 			break
 		}

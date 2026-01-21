@@ -55,7 +55,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			return nil, fmt.Errorf("formatting router: %w", err)
 		}
 		outputs = append(outputs, Output{
-			Filename: "router.go",
+			Filename: "router.eugene.go",
 			Content:  string(formatted),
 		})
 	}
@@ -71,7 +71,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			return nil, fmt.Errorf("formatting types: %w", err)
 		}
 		outputs = append(outputs, Output{
-			Filename: "types.go",
+			Filename: "types.eugene.go",
 			Content:  string(formatted),
 		})
 	}
@@ -90,7 +90,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			return nil, fmt.Errorf("formatting server: %w", err)
 		}
 		outputs = append(outputs, Output{
-			Filename: "server.go",
+			Filename: "server.eugene.go",
 			Content:  string(formatted),
 		})
 	}
@@ -110,7 +110,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			return nil, fmt.Errorf("formatting strict types: %w", err)
 		}
 		outputs = append(outputs, Output{
-			Filename: "strict_types.go",
+			Filename: "strict_types.eugene.go",
 			Content:  string(typesFormatted),
 		})
 		// Generate strict adapter (framework-specific handler wrapper)
@@ -123,7 +123,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			return nil, fmt.Errorf("formatting strict adapter: %w", err)
 		}
 		outputs = append(outputs, Output{
-			Filename: "strict_server.go",
+			Filename: "strict_server.eugene.go",
 			Content:  string(adapterFormatted),
 		})
 	}
@@ -139,7 +139,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			return nil, fmt.Errorf("formatting client: %w", err)
 		}
 		outputs = append(outputs, Output{
-			Filename: "client.go",
+			Filename: "client.eugene.go",
 			Content:  string(formatted),
 		})
 	}
@@ -155,7 +155,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			return nil, fmt.Errorf("formatting spec: %w", err)
 		}
 		outputs = append(outputs, Output{
-			Filename: "spec.go",
+			Filename: "spec.eugene.go",
 			Content:  string(formatted),
 		})
 	}

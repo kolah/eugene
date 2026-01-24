@@ -25,7 +25,11 @@ import (
 {{ end }}
 {{- /* Generate top-level schemas */ -}}
 {{- range .Schemas }}
-{{- if not (isComposition .) }}
+{{- if isAlias . }}
+{{ if .Description }}{{ goComment .Description }}
+{{ end -}}
+type {{ pascalCase .Name }} = {{ refToTypeName .Ref }}
+{{- else if not (isComposition .) }}
 {{ if .Description }}{{ goComment .Description }}
 {{ end -}}
 {{- $extType := goTypeExt . -}}

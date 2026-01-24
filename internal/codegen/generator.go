@@ -16,8 +16,10 @@ import (
 )
 
 type Generator struct {
-	config *config.Config
-	engine templates.Engine
+	config        *config.Config
+	engine        templates.Engine
+	registry      *golang.EnumRegistry
+	resolverState *golang.TemplateResolverState
 }
 
 type Output struct {
@@ -30,19 +32,33 @@ func New(cfg *config.Config) (*Generator, error) {
 		golang.SetAdditionalInitialisms(cfg.Go.OutputOptions.AdditionalInitialisms)
 	}
 
-	engine, err := templates.NewEngine(embeddedtmpl.FS, cfg.Templates.Dir, golang.TemplateFuncsWithResolver(&cfg.Go.Types))
+	funcs, resolverState := golang.TemplateFuncsWithResolver(&cfg.Go.Types)
+	engine, err := templates.NewEngine(embeddedtmpl.FS, cfg.Templates.Dir, funcs)
 	if err != nil {
 		return nil, fmt.Errorf("creating template engine: %w", err)
 	}
 
 	return &Generator{
-		config: cfg,
-		engine: engine,
+		config:        cfg,
+		engine:        engine,
+		resolverState: resolverState,
 	}, nil
 }
 
 func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error) {
 	var outputs []Output
+
+	// Phase 1: Collect all enum usages
+	g.registry = golang.NewEnumRegistry()
+	g.collectEnums(spec)
+
+	// Phase 2: Resolve canonical names
+	g.registry.ResolveNames()
+
+	// Phase 3: Share registry with template resolver
+	g.resolverState.SetRegistry(g.registry)
+
+	// Phase 4: Generate with shared registry
 
 	// Generate router.go for Echo when server or strict-server is present
 	if g.config.Go.ServerFramework == "echo" && (g.config.HasTarget("server") || g.config.HasTarget("strict-server")) {
@@ -62,7 +78,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 
 	if g.config.HasTarget("types") {
 		target := types.New()
-		content, err := target.Generate(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, &g.config.Go.OutputOptions, g.config.Go.ImportMapping)
+		content, err := target.Generate(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, &g.config.Go.OutputOptions, g.config.Go.ImportMapping, g.registry)
 		if err != nil {
 			return nil, fmt.Errorf("generating types: %w", err)
 		}
@@ -81,7 +97,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 		if err != nil {
 			return nil, err
 		}
-		content, err := target.Generate(g.engine, spec, g.config.Go.Package)
+		content, err := target.Generate(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, g.registry)
 		if err != nil {
 			return nil, fmt.Errorf("generating server: %w", err)
 		}
@@ -101,7 +117,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			return nil, err
 		}
 		// Generate strict types (request/response types + interface)
-		typesContent, err := target.GenerateTypes(g.engine, spec, g.config.Go.Package)
+		typesContent, err := target.GenerateTypes(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, g.registry)
 		if err != nil {
 			return nil, fmt.Errorf("generating strict types: %w", err)
 		}
@@ -114,7 +130,7 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			Content:  string(typesFormatted),
 		})
 		// Generate strict adapter (framework-specific handler wrapper)
-		adapterContent, err := target.GenerateAdapter(g.engine, spec, g.config.Go.Package)
+		adapterContent, err := target.GenerateAdapter(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, g.registry)
 		if err != nil {
 			return nil, fmt.Errorf("generating strict adapter: %w", err)
 		}
@@ -161,4 +177,25 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 	}
 
 	return outputs, nil
+}
+
+// collectEnums walks the spec and collects all enum usages for stable naming.
+func (g *Generator) collectEnums(spec *model.Spec) {
+	// Collect from operation parameters
+	for _, op := range spec.Operations {
+		for _, p := range op.Parameters {
+			if p.Schema != nil && len(p.Schema.Enum) > 0 {
+				g.registry.CollectEnum(p.Name, op.ID, p.Schema.Enum)
+			}
+		}
+	}
+
+	// Collect from schema properties
+	for _, s := range spec.Schemas {
+		for _, prop := range s.Properties {
+			if prop.Schema != nil && len(prop.Schema.Enum) > 0 {
+				g.registry.CollectEnum(prop.Name, s.Name, prop.Schema.Enum)
+			}
+		}
+	}
 }

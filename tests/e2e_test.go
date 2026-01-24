@@ -56,8 +56,7 @@ func (h *BasicEchoHandler) EchoMultipart(ctx echo.Context, req basic.EchoMultipa
 	})
 }
 
-func (h *BasicEchoHandler) GetItem(ctx echo.Context, id string) error {
-	filter := ctx.QueryParam("filter")
+func (h *BasicEchoHandler) GetItem(ctx echo.Context, id string, params basic.GetItemQueryParams) error {
 	requestID := ctx.Request().Header.Get("X-Request-ID")
 
 	if id == "not-found" {
@@ -71,7 +70,7 @@ func (h *BasicEchoHandler) GetItem(ctx echo.Context, id string) error {
 
 	return ctx.JSON(http.StatusOK, basic.ItemWithParams{
 		ID:        &id,
-		Filter:    &filter,
+		Filter:    params.Filter,
 		RequestID: &requestID,
 	})
 }
@@ -85,7 +84,7 @@ func (h *BasicEchoHandler) CreateResource(ctx echo.Context) error {
 	return ctx.JSON(http.StatusCreated, basic.Resource{
 		ID:          &id,
 		Name:        &body.Name,
-		Status:      (*basic.ResourceStatus)(body.Status),
+		Status:      (*basic.Status)(body.Status),
 		Description: body.Description,
 	})
 }
@@ -177,7 +176,7 @@ func (h *StrictEchoHandler) CreateResource(ctx context.Context, req strict.Creat
 	return strict.CreateResource201JSONResponse{
 		ID:          &id,
 		Name:        &req.Body.Name,
-		Status:      (*strict.ResourceStatus)(req.Body.Status),
+		Status:      (*strict.Status)(req.Body.Status),
 		Description: req.Body.Description,
 	}, nil
 }
@@ -250,8 +249,7 @@ func (h *ChiHandler) EchoMultipart(w http.ResponseWriter, r *http.Request, req c
 	})
 }
 
-func (h *ChiHandler) GetItem(w http.ResponseWriter, r *http.Request, id string) {
-	filter := r.URL.Query().Get("filter")
+func (h *ChiHandler) GetItem(w http.ResponseWriter, r *http.Request, id string, params chiGen.GetItemQueryParams) {
 	requestID := r.Header.Get("X-Request-ID")
 
 	if id == "not-found" {
@@ -269,7 +267,7 @@ func (h *ChiHandler) GetItem(w http.ResponseWriter, r *http.Request, id string) 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(chiGen.ItemWithParams{
 		ID:        &id,
-		Filter:    &filter,
+		Filter:    params.Filter,
 		RequestID: &requestID,
 	})
 }
@@ -286,7 +284,7 @@ func (h *ChiHandler) CreateResource(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(chiGen.Resource{
 		ID:          &id,
 		Name:        &body.Name,
-		Status:      (*chiGen.ResourceStatus)(body.Status),
+		Status:      (*chiGen.Status)(body.Status),
 		Description: body.Description,
 	})
 }
@@ -390,8 +388,7 @@ func (h *StdlibHandler) EchoMultipart(w http.ResponseWriter, r *http.Request, re
 	})
 }
 
-func (h *StdlibHandler) GetItem(w http.ResponseWriter, r *http.Request, id string) {
-	filter := r.URL.Query().Get("filter")
+func (h *StdlibHandler) GetItem(w http.ResponseWriter, r *http.Request, id string, params stdlibGen.GetItemQueryParams) {
 	requestID := r.Header.Get("X-Request-ID")
 
 	if id == "not-found" {
@@ -409,7 +406,7 @@ func (h *StdlibHandler) GetItem(w http.ResponseWriter, r *http.Request, id strin
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stdlibGen.ItemWithParams{
 		ID:        &id,
-		Filter:    &filter,
+		Filter:    params.Filter,
 		RequestID: &requestID,
 	})
 }
@@ -426,7 +423,7 @@ func (h *StdlibHandler) CreateResource(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(stdlibGen.Resource{
 		ID:          &id,
 		Name:        &body.Name,
-		Status:      (*stdlibGen.ResourceStatus)(body.Status),
+		Status:      (*stdlibGen.Status)(body.Status),
 		Description: body.Description,
 	})
 }
@@ -844,7 +841,7 @@ func TestE2EMultipleStatusCodes(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("201 Created response", func(t *testing.T) {
-		status := basic.NewResourceStatusActive
+		status := basic.StatusActive
 		resp, err := client.CreateResource(ctx, basic.NewResource{
 			Name:   "new-resource",
 			Status: &status,
@@ -854,7 +851,7 @@ func TestE2EMultipleStatusCodes(t *testing.T) {
 		require.NotNil(t, resp.JSON201)
 		assert.Equal(t, "res-123", *resp.JSON201.ID)
 		assert.Equal(t, "new-resource", *resp.JSON201.Name)
-		assert.Equal(t, basic.ResourceStatusActive, *resp.JSON201.Status)
+		assert.Equal(t, basic.StatusActive, *resp.JSON201.Status)
 	})
 
 	t.Run("204 No Content response", func(t *testing.T) {
@@ -979,36 +976,36 @@ func TestE2EEnums(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Enum round-trip - pending", func(t *testing.T) {
-		status := basic.NewResourceStatusPending
+		status := basic.StatusPending
 		resp, err := client.CreateResource(ctx, basic.NewResource{
 			Name:   "pending-resource",
 			Status: &status,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp.JSON201)
-		assert.Equal(t, basic.ResourceStatusPending, *resp.JSON201.Status)
+		assert.Equal(t, basic.StatusPending, *resp.JSON201.Status)
 	})
 
 	t.Run("Enum round-trip - active", func(t *testing.T) {
-		status := basic.NewResourceStatusActive
+		status := basic.StatusActive
 		resp, err := client.CreateResource(ctx, basic.NewResource{
 			Name:   "active-resource",
 			Status: &status,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp.JSON201)
-		assert.Equal(t, basic.ResourceStatusActive, *resp.JSON201.Status)
+		assert.Equal(t, basic.StatusActive, *resp.JSON201.Status)
 	})
 
 	t.Run("Enum round-trip - completed", func(t *testing.T) {
-		status := basic.NewResourceStatusCompleted
+		status := basic.StatusCompleted
 		resp, err := client.CreateResource(ctx, basic.NewResource{
 			Name:   "completed-resource",
 			Status: &status,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp.JSON201)
-		assert.Equal(t, basic.ResourceStatusCompleted, *resp.JSON201.Status)
+		assert.Equal(t, basic.StatusCompleted, *resp.JSON201.Status)
 	})
 }
 
@@ -1025,7 +1022,7 @@ func TestE2ENullable(t *testing.T) {
 
 	t.Run("Nullable field with value", func(t *testing.T) {
 		desc := "a description"
-		status := basic.NewResourceStatusActive
+		status := basic.StatusActive
 		resp, err := client.CreateResource(ctx, basic.NewResource{
 			Name:        "resource-with-desc",
 			Status:      &status,
@@ -1038,7 +1035,7 @@ func TestE2ENullable(t *testing.T) {
 	})
 
 	t.Run("Nullable field absent", func(t *testing.T) {
-		status := basic.NewResourceStatusActive
+		status := basic.StatusActive
 		resp, err := client.CreateResource(ctx, basic.NewResource{
 			Name:   "resource-no-desc",
 			Status: &status,

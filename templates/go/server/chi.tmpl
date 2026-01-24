@@ -16,9 +16,28 @@ import (
 	"mime/multipart"
 {{- end }}
 	"net/http"
+{{- if .Features.HasQueryParams }}
+	"strconv"
+{{- end }}
+{{- if .TimeImport }}
+	"time"
+{{- end }}
 
 	"github.com/go-chi/chi/v5"
+{{- if .UUIDImport }}
+	"{{ .UUIDImport }}"
+{{- end }}
 )
+{{- range $enum := .InlineEnums }}
+
+type {{ $enum.Name }} string
+
+const (
+{{- range $enum.Values }}
+	{{ $enum.Name }}{{ . | pascalCase }} {{ $enum.Name }} = "{{ . }}"
+{{- end }}
+)
+{{- end }}
 {{- if .Features.HasStreaming }}
 
 // Writer writes Server-Sent Events to an HTTP response.
@@ -81,12 +100,20 @@ type {{ .ID | pascalCase }}FormRequest struct {
 {{- end }}
 }
 {{- end }}
+{{- if .HasQueryParams }}
+
+type {{ .ID | pascalCase }}QueryParams struct {
+{{- range .QueryParams }}
+	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }}
+{{- end }}
+}
+{{- end }}
 {{- end }}
 
 type ServerInterface interface {
 {{- range .Operations }}
 	// {{ .ID | pascalCase }}{{ if .Summary }} - {{ .Summary }}{{ end }}{{ if .IsStreaming }} (streaming){{ end }}
-	{{ .ID | pascalCase }}(w http.ResponseWriter, r *http.Request{{ range .Parameters }}{{ if eq .In "path" }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ end }}{{ if .HasQueryString }}, {{ .QueryString.GoName | lower }} *{{ .QueryString.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .ID | pascalCase }}MultipartRequest{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .ID | pascalCase }}FormRequest{{ end }})
+	{{ .ID | pascalCase }}(w http.ResponseWriter, r *http.Request{{ range .Parameters }}, {{ .GoName | camelCase }} {{ .Type }}{{ end }}{{ if .HasQueryParams }}, params {{ .ID | pascalCase }}QueryParams{{ end }}{{ if .HasQueryString }}, {{ .QueryString.GoName | camelCase }} *{{ .QueryString.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .ID | pascalCase }}MultipartRequest{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .ID | pascalCase }}FormRequest{{ end }})
 {{- end }}
 }
 
@@ -96,13 +123,70 @@ type ServerInterfaceWrapper struct {
 {{ range .Operations }}
 func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, r *http.Request) {
 {{- range .Parameters }}
-{{- if eq .In "path" }}
-	{{ .GoName | lower }} := chi.URLParam(r, "{{ .Name }}")
+{{- if eq .Type "uuid.UUID" }}
+	{{ .GoName | camelCase }}, err := uuid.Parse(chi.URLParam(r, "{{ .Name }}"))
+	if err != nil {
+		http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+		return
+	}
+{{- else }}
+	{{ .GoName | camelCase }} := chi.URLParam(r, "{{ .Name }}")
+{{- end }}
+{{- end }}
+{{- if .HasQueryParams }}
+	var params {{ .ID | pascalCase }}QueryParams
+{{- range .QueryParams }}
+{{- if hasPrefix .Type "[]" }}
+	if values := r.URL.Query()["{{ .Name }}"]; len(values) > 0 {
+		{{ if .Required }}params.{{ .GoName }} = values{{ else }}params.{{ .GoName }} = &values{{ end }}
+	}
+{{- else if eq .Type "string" }}
+	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
+		{{ if .Required }}params.{{ .GoName }} = v{{ else }}params.{{ .GoName }} = &v{{ end }}
+	}
+{{- else if eq .Type "int" }}
+	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil {
+			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else if eq .Type "int64" }}
+	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else if eq .Type "int32" }}
+	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 32); err == nil {
+			val := int32(parsed)
+			{{ if .Required }}params.{{ .GoName }} = val{{ else }}params.{{ .GoName }} = &val{{ end }}
+		}
+	}
+{{- else if eq .Type "bool" }}
+	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.ParseBool(v); err == nil {
+			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else if eq .Type "uuid.UUID" }}
+	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
+		if parsed, err := uuid.Parse(v); err == nil {
+			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else }}
+	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
+		{{ if .Required }}typed := {{ .Type }}(v)
+		params.{{ .GoName }} = typed{{ else }}typed := {{ .Type }}(v)
+		params.{{ .GoName }} = &typed{{ end }}
+	}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- if .HasQueryString }}
-	var {{ .QueryString.GoName | lower }} {{ .QueryString.Type }}
-	if err := decodeQueryString(r, &{{ .QueryString.GoName | lower }}); err != nil {
+	var {{ .QueryString.GoName | camelCase }} {{ .QueryString.Type }}
+	if err := decodeQueryString(r, &{{ .QueryString.GoName | camelCase }}); err != nil {
 		http.Error(rw, "invalid query parameters", http.StatusBadRequest)
 		return
 	}
@@ -149,7 +233,7 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 {{- end }}
 {{- end }}
 {{- end }}
-	w.Handler.{{ .ID | pascalCase }}(rw, r{{ range .Parameters }}{{ if eq .In "path" }}, {{ .GoName | lower }}{{ end }}{{ end }}{{ if .HasQueryString }}, &{{ .QueryString.GoName | lower }}{{ end }}{{ if .IsMultipart }}, req{{ end }}{{ if .IsFormUrlEncoded }}, req{{ end }})
+	w.Handler.{{ .ID | pascalCase }}(rw, r{{ range .Parameters }}, {{ .GoName | camelCase }}{{ end }}{{ if .HasQueryParams }}, params{{ end }}{{ if .HasQueryString }}, &{{ .QueryString.GoName | camelCase }}{{ end }}{{ if .IsMultipart }}, req{{ end }}{{ if .IsFormUrlEncoded }}, req{{ end }})
 }
 {{ end }}
 {{- if .Features.HasQueryString }}

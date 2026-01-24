@@ -3,13 +3,18 @@ package gen
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 )
 
+type ListItemsQueryParams struct {
+	Limit *int
+}
+
 type ServerInterface interface {
 	// ListItems
-	ListItems(w http.ResponseWriter, r *http.Request)
+	ListItems(w http.ResponseWriter, r *http.Request, params ListItemsQueryParams)
 	// CreateItem
 	CreateItem(w http.ResponseWriter, r *http.Request)
 	// GetItem
@@ -25,7 +30,13 @@ type ServerInterfaceWrapper struct {
 }
 
 func (w *ServerInterfaceWrapper) ListItems(rw http.ResponseWriter, r *http.Request) {
-	w.Handler.ListItems(rw, r)
+	var params ListItemsQueryParams
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil {
+			params.Limit = &parsed
+		}
+	}
+	w.Handler.ListItems(rw, r, params)
 }
 
 func (w *ServerInterfaceWrapper) CreateItem(rw http.ResponseWriter, r *http.Request) {

@@ -27,9 +27,25 @@ func toSchemaPtr(s any) *model.Schema {
 	}
 }
 
+// TemplateResolverState holds state that can be shared between generator and templates.
+type TemplateResolverState struct {
+	resolver *TypeResolver
+	registry *EnumRegistry
+}
+
+// SetRegistry sets the enum registry for the template resolver.
+func (s *TemplateResolverState) SetRegistry(registry *EnumRegistry) {
+	s.registry = registry
+	if s.resolver != nil {
+		s.resolver.registry = registry
+	}
+}
+
 // TemplateFuncsWithResolver returns template functions with a resolver for context-aware type resolution.
-func TemplateFuncsWithResolver(cfg *config.TypesConfig) template.FuncMap {
+// It also returns a TemplateResolverState that can be used to set the registry later.
+func TemplateFuncsWithResolver(cfg *config.TypesConfig) (template.FuncMap, *TemplateResolverState) {
 	resolver := NewTypeResolver(cfg)
+	state := &TemplateResolverState{resolver: resolver}
 
 	funcs := TemplateFuncs()
 	funcs["resolveType"] = func(s any, parentName, fieldName string) string {
@@ -41,7 +57,7 @@ func TemplateFuncsWithResolver(cfg *config.TypesConfig) template.FuncMap {
 	funcs["useNullable"] = func() bool {
 		return cfg != nil && cfg.NullableStrategy == "nullable"
 	}
-	return funcs
+	return funcs, state
 }
 
 func TemplateFuncs() template.FuncMap {
@@ -77,6 +93,7 @@ func TemplateFuncs() template.FuncMap {
 		"statusCodeInt":  StatusCodeInt,
 		"title":          Title,
 		"isComposition":  isCompositionAny,
+		"isAlias":        isAliasAny,
 	}
 }
 
@@ -324,6 +341,14 @@ func isCompositionAny(s any) bool {
 		return false
 	}
 	return len(schema.OneOf) > 0 || len(schema.AnyOf) > 0 || len(schema.AllOf) > 0
+}
+
+func isAliasAny(s any) bool {
+	schema := toSchemaPtr(s)
+	if schema == nil {
+		return false
+	}
+	return schema.Name != "" && schema.Ref != "" && schema.Type == "" && len(schema.Properties) == 0
 }
 
 // CollectExtensionImports collects custom imports from x-oink-go-type-import extensions.

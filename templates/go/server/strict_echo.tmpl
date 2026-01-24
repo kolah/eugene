@@ -6,8 +6,14 @@ import (
 {{- if .HasQueryParams }}
 	"strconv"
 {{- end }}
+{{- if .TimeImport }}
+	"time"
+{{- end }}
 
 	"github.com/labstack/echo/v4"
+{{- if .UUIDImport }}
+	"{{ .UUIDImport }}"
+{{- end }}
 )
 
 // StrictEchoHandler wraps a StrictServerInterface to handle Echo requests.
@@ -22,11 +28,19 @@ func NewStrictHandler(ssi StrictServerInterface) *StrictEchoHandler {
 {{ range .Operations }}
 // {{ .ID }} handles {{ .Method }} {{ .Path }}
 func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
-{{- if or .PathParams .QueryParams .HeaderParams .RequestBody }}
+{{- if or .PathParams .QueryParams .HeaderParams .QueryString .RequestBody }}
 	var request {{ .ID }}RequestObject
 {{- end }}
 {{- range .PathParams }}
+{{- if eq .Type "uuid.UUID" }}
+	if parsed, err := uuid.Parse(ctx.Param("{{ .Name }}")); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+	} else {
+		request.{{ .GoName }} = parsed
+	}
+{{- else }}
 	request.{{ .GoName }} = ctx.Param("{{ .Name }}")
+{{- end }}
 {{- end }}
 {{- range .QueryParams }}
 {{- if hasPrefix .Type "[]" }}
@@ -55,15 +69,28 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
 		}
 	}
+{{- else if eq .Type "uuid.UUID" }}
+	if v := ctx.QueryParam("{{ .Name }}"); v != "" {
+		if parsed, err := uuid.Parse(v); err == nil {
+			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
 {{- else }}
 	if v := ctx.QueryParam("{{ .Name }}"); v != "" {
-		request.{{ .GoName }} = {{ if not .Required }}&{{ end }}v
+		{{ if .Required }}typed := {{ .Type }}(v)
+		request.{{ .GoName }} = typed{{ else }}typed := {{ .Type }}(v)
+		request.{{ .GoName }} = &typed{{ end }}
 	}
 {{- end }}
 {{- end }}
 {{- range .HeaderParams }}
 	if v := ctx.Request().Header.Get("{{ .Name }}"); v != "" {
 		request.{{ .GoName }} = {{ if not .Required }}&{{ end }}v
+	}
+{{- end }}
+{{- if .QueryString }}
+	if err := ctx.Bind(&request.{{ .QueryString.GoName }}); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid querystring")
 	}
 {{- end }}
 {{- if .RequestBody }}
@@ -77,7 +104,7 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 	}{{ end }}
 {{- end }}
 
-	response, err := h.ssi.{{ .ID }}(ctx.Request().Context(){{ if or .PathParams .QueryParams .HeaderParams .RequestBody }}, request{{ end }})
+	response, err := h.ssi.{{ .ID }}(ctx.Request().Context(){{ if or .PathParams .QueryParams .HeaderParams .QueryString .RequestBody }}, request{{ end }})
 	if err != nil {
 		return err
 	}

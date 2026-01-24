@@ -27,8 +27,11 @@ type templateData struct {
 	MappedImports    []string
 }
 
-func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string, cfg *config.TypesConfig, opts *config.OutputOptions, importMapping map[string]string) (string, error) {
-	resolver := golang.NewTypeResolverWithImportMapping(cfg, importMapping)
+func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string, cfg *config.TypesConfig, opts *config.OutputOptions, importMapping map[string]string, registry *golang.EnumRegistry) (string, error) {
+	schemaLookup := func(ref string) *model.Schema {
+		return spec.SchemaByRef(ref)
+	}
+	resolver := golang.NewTypeResolverWithSchemaLookup(cfg, importMapping, registry, schemaLookup)
 
 	// Process all schemas to resolve types and collect nested types
 	for _, s := range spec.Schemas {

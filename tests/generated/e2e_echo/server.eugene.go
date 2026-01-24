@@ -19,6 +19,10 @@ type EchoMultipartMultipartRequest struct {
 	Description string                `form:"description"`
 }
 
+type GetItemQueryParams struct {
+	Filter *string `query:"filter"`
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(ctx echo.Context) error
@@ -27,7 +31,7 @@ type ServerInterface interface {
 	// EchoMultipart
 	EchoMultipart(ctx echo.Context, req EchoMultipartMultipartRequest) error
 	// GetItem
-	GetItem(ctx echo.Context, id string) error
+	GetItem(ctx echo.Context, id string, params GetItemQueryParams) error
 	// CreateResource
 	CreateResource(ctx echo.Context) error
 	// DeleteResource
@@ -73,7 +77,11 @@ func (w *ServerInterfaceWrapper) EchoMultipart(ctx echo.Context) error {
 
 func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 	id := ctx.Param("id")
-	return w.Handler.GetItem(ctx, id)
+	var params GetItemQueryParams
+	if err := ctx.Bind(&params); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	}
+	return w.Handler.GetItem(ctx, id, params)
 }
 
 func (w *ServerInterfaceWrapper) CreateResource(ctx echo.Context) error {

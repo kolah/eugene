@@ -16,15 +16,15 @@ type OrderAccepted struct {
 }
 
 type OrderCallback struct {
-	OrderID   string              `json:"orderId"`
-	Status    OrderCallbackStatus `json:"status"`
-	Result    map[string]any      `json:"result,omitempty"`
-	Timestamp time.Time           `json:"timestamp"`
+	OrderID   string         `json:"orderId"`
+	Status    Status         `json:"status"`
+	Result    map[string]any `json:"result,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
 }
 
-type OrderCallbackStatus string
+type Status string
 
 const (
-	OrderCallbackStatusCompleted OrderCallbackStatus = "completed"
-	OrderCallbackStatusFailed    OrderCallbackStatus = "failed"
+	StatusCompleted Status = "completed"
+	StatusFailed    Status = "failed"
 )

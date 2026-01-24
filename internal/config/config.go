@@ -39,6 +39,7 @@ type TypesConfig struct {
 	EnumStrategy     string `koanf:"enum-strategy"`
 	UUIDPackage      string `koanf:"uuid-package"`
 	NullableStrategy string `koanf:"nullable-strategy"`
+	AllOfStrategy    string `koanf:"allof-strategy"`
 }
 
 type OutputOptions struct {
@@ -189,6 +190,9 @@ func buildFlagsMap(cmd *cobra.Command) map[string]any {
 	if v := getString("nullable-strategy"); v != "" {
 		m["go.types.nullable-strategy"] = v
 	}
+	if v := getString("allof-strategy"); v != "" {
+		m["go.types.allof-strategy"] = v
+	}
 	if flagChanged("enable-yaml-tags") {
 		m["go.output-options.enable-yaml-tags"] = getBool("enable-yaml-tags")
 	}
@@ -228,6 +232,11 @@ func (c *Config) Validate() error {
 	validNullableStrategies := map[string]bool{"": true, "pointer": true, "nullable": true}
 	if !validNullableStrategies[c.Go.Types.NullableStrategy] {
 		return fmt.Errorf("invalid nullable strategy: %s (valid: pointer, nullable)", c.Go.Types.NullableStrategy)
+	}
+
+	validAllOfStrategies := map[string]bool{"": true, "embed": true, "flatten": true}
+	if !validAllOfStrategies[c.Go.Types.AllOfStrategy] {
+		return fmt.Errorf("invalid allof strategy: %s (valid: embed, flatten)", c.Go.Types.AllOfStrategy)
 	}
 
 	validTargets := map[string]bool{

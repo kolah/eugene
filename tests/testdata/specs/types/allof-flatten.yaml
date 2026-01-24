@@ -1,0 +1,58 @@
+openapi: "3.0.3"
+info:
+  title: AllOf Flatten Test
+  version: "1.0.0"
+paths:
+  /workspace-owners:
+    post:
+      operationId: createWorkspaceOwner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceOwner"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceOwner"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        avatarUrl:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - createdAt
+        - updatedAt
+    WorkspaceOwner:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            promotedAt:
+              type: string
+              format: date-time
+          required:
+            - promotedAt

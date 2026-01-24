@@ -15,77 +15,10 @@ type Priority struct {
 }
 
 type Item struct {
-	ID       *string       `json:"id,omitempty"`
-	Status   *ItemStatus   `json:"status,omitempty"`
-	Priority *ItemPriority `json:"priority,omitempty"`
+	ID       *string   `json:"id,omitempty"`
+	Status   *Status   `json:"status,omitempty"`
+	Priority *Priority `json:"priority,omitempty"`
 }
-
-type ItemStatus struct {
-	value string
-}
-
-func (e ItemStatus) String() string { return fmt.Sprintf("%v", e.value) }
-func (e ItemStatus) Value() string  { return e.value }
-func (e ItemStatus) IsValid() bool {
-	switch e.value {
-	case "pending":
-		return true
-	case "active":
-		return true
-	case "completed":
-		return true
-	case "cancelled":
-		return true
-	}
-	return false
-}
-
-func (e ItemStatus) MarshalJSON() ([]byte, error) {
-	return json.Marshal(e.value)
-}
-
-func (e *ItemStatus) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, &e.value)
-}
-
-var (
-	ItemStatusPending   = ItemStatus{value: "pending"}
-	ItemStatusActive    = ItemStatus{value: "active"}
-	ItemStatusCompleted = ItemStatus{value: "completed"}
-	ItemStatusCancelled = ItemStatus{value: "cancelled"}
-)
-
-type ItemPriority struct {
-	value int
-}
-
-func (e ItemPriority) String() string { return fmt.Sprintf("%v", e.value) }
-func (e ItemPriority) Value() int     { return e.value }
-func (e ItemPriority) IsValid() bool {
-	switch e.value {
-	case 1:
-		return true
-	case 2:
-		return true
-	case 3:
-		return true
-	}
-	return false
-}
-
-func (e ItemPriority) MarshalJSON() ([]byte, error) {
-	return json.Marshal(e.value)
-}
-
-func (e *ItemPriority) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, &e.value)
-}
-
-var (
-	ItemPriority1 = ItemPriority{value: 1}
-	ItemPriority2 = ItemPriority{value: 2}
-	ItemPriority3 = ItemPriority{value: 3}
-)
 
 func (e Status) String() string { return fmt.Sprintf("%v", e.value) }
 func (e Status) Value() string  { return e.value }

@@ -17,6 +17,10 @@ type EchoMultipartMultipartRequest struct {
 	Description string                `form:"description"`
 }
 
+type GetItemQueryParams struct {
+	Filter *string
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(w http.ResponseWriter, r *http.Request)
@@ -25,7 +29,7 @@ type ServerInterface interface {
 	// EchoMultipart
 	EchoMultipart(w http.ResponseWriter, r *http.Request, req EchoMultipartMultipartRequest)
 	// GetItem
-	GetItem(w http.ResponseWriter, r *http.Request, id string)
+	GetItem(w http.ResponseWriter, r *http.Request, id string, params GetItemQueryParams)
 	// CreateResource
 	CreateResource(w http.ResponseWriter, r *http.Request)
 	// DeleteResource
@@ -75,7 +79,11 @@ func (w *ServerInterfaceWrapper) EchoMultipart(rw http.ResponseWriter, r *http.R
 
 func (w *ServerInterfaceWrapper) GetItem(rw http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	w.Handler.GetItem(rw, r, id)
+	var params GetItemQueryParams
+	if v := r.URL.Query().Get("filter"); v != "" {
+		params.Filter = &v
+	}
+	w.Handler.GetItem(rw, r, id, params)
 }
 
 func (w *ServerInterfaceWrapper) CreateResource(rw http.ResponseWriter, r *http.Request) {

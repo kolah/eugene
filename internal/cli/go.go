@@ -53,6 +53,7 @@ func NewGoCmd() *cobra.Command {
 	flags.String("enum-strategy", "", "Enum strategy: const, type, struct")
 	flags.String("uuid-package", "", "UUID type: string, google, gofrs")
 	flags.String("nullable-strategy", "", "Nullable strategy: pointer, nullable")
+	flags.String("allof-strategy", "", "AllOf strategy: embed (default), flatten")
 	flags.Bool("enable-yaml-tags", false, "Generate yaml tags")
 	flags.StringSlice("additional-initialisms", nil, "Additional initialisms")
 

@@ -6,10 +6,10 @@ import (
 )
 
 type OrderStatusEvent struct {
-	EventID   string               `json:"eventId"`
-	EventType string               `json:"eventType"`
-	Timestamp time.Time            `json:"timestamp"`
-	Data      OrderStatusEventData `json:"data"`
+	EventID   string    `json:"eventId"`
+	EventType string    `json:"eventType"`
+	Timestamp time.Time `json:"timestamp"`
+	Data      OrderData `json:"data"`
 }
 
 type OrderData struct {
@@ -22,10 +22,4 @@ type UserEvent struct {
 	EventID   string `json:"eventId"`
 	EventType string `json:"eventType"`
 	UserID    string `json:"userId"`
-}
-
-type OrderStatusEventData struct {
-	OrderID        *string `json:"orderId,omitempty"`
-	PreviousStatus *string `json:"previousStatus,omitempty"`
-	NewStatus      *string `json:"newStatus,omitempty"`
 }

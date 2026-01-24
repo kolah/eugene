@@ -14,9 +14,25 @@ import (
 	"mime/multipart"
 {{- end }}
 	"net/http"
+{{- if .TimeImport }}
+	"time"
+{{- end }}
 
 	"github.com/labstack/echo/v4"
+{{- if .UUIDImport }}
+	"{{ .UUIDImport }}"
+{{- end }}
 )
+{{- range $enum := .InlineEnums }}
+
+type {{ $enum.Name }} string
+
+const (
+{{- range $enum.Values }}
+	{{ $enum.Name }}{{ . | pascalCase }} {{ $enum.Name }} = "{{ . }}"
+{{- end }}
+)
+{{- end }}
 {{- if .Features.HasStreaming }}
 
 // Writer writes Server-Sent Events to an HTTP response.
@@ -80,12 +96,20 @@ type {{ .ID | pascalCase }}FormRequest struct {
 {{- end }}
 }
 {{- end }}
+{{- if .HasQueryParams }}
+
+type {{ .ID | pascalCase }}QueryParams struct {
+{{- range .QueryParams }}
+	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }} `query:"{{ .Name }}"`
+{{- end }}
+}
+{{- end }}
 {{- end }}
 
 type ServerInterface interface {
 {{- range .Operations }}
 	// {{ .ID | pascalCase }}{{ if .Summary }} - {{ .Summary }}{{ end }}{{ if .IsStreaming }} (streaming){{ end }}
-	{{ .ID | pascalCase }}(ctx echo.Context{{ range .Parameters }}{{ if eq .In "path" }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ end }}{{ if .HasQueryString }}, {{ .QueryString.GoName | lower }} *{{ .QueryString.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .ID | pascalCase }}MultipartRequest{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .ID | pascalCase }}FormRequest{{ end }}) error
+	{{ .ID | pascalCase }}(ctx echo.Context{{ range .Parameters }}, {{ .GoName | camelCase }} {{ .Type }}{{ end }}{{ if .HasQueryParams }}, params {{ .ID | pascalCase }}QueryParams{{ end }}{{ if .HasQueryString }}, {{ .QueryString.GoName | camelCase }} *{{ .QueryString.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .ID | pascalCase }}MultipartRequest{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .ID | pascalCase }}FormRequest{{ end }}) error
 {{- end }}
 }
 
@@ -95,13 +119,24 @@ type ServerInterfaceWrapper struct {
 {{ range .Operations }}
 func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error {
 {{- range .Parameters }}
-{{- if eq .In "path" }}
-	{{ .GoName | lower }} := ctx.Param("{{ .Name }}")
+{{- if eq .Type "uuid.UUID" }}
+	{{ .GoName | camelCase }}, err := uuid.Parse(ctx.Param("{{ .Name }}"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+	}
+{{- else }}
+	{{ .GoName | camelCase }} := ctx.Param("{{ .Name }}")
 {{- end }}
+{{- end }}
+{{- if .HasQueryParams }}
+	var params {{ .ID | pascalCase }}QueryParams
+	if err := ctx.Bind(&params); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	}
 {{- end }}
 {{- if .HasQueryString }}
-	var {{ .QueryString.GoName | lower }} {{ .QueryString.Type }}
-	if err := ctx.Bind(&{{ .QueryString.GoName | lower }}); err != nil {
+	var {{ .QueryString.GoName | camelCase }} {{ .QueryString.Type }}
+	if err := ctx.Bind(&{{ .QueryString.GoName | camelCase }}); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
 	}
 {{- end }}
@@ -143,7 +178,7 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 {{- end }}
 {{- end }}
 {{- end }}
-	return w.Handler.{{ .ID | pascalCase }}(ctx{{ range .Parameters }}{{ if eq .In "path" }}, {{ .GoName | lower }}{{ end }}{{ end }}{{ if .HasQueryString }}, &{{ .QueryString.GoName | lower }}{{ end }}{{ if .IsMultipart }}, req{{ end }}{{ if .IsFormUrlEncoded }}, req{{ end }})
+	return w.Handler.{{ .ID | pascalCase }}(ctx{{ range .Parameters }}, {{ .GoName | camelCase }}{{ end }}{{ if .HasQueryParams }}, params{{ end }}{{ if .HasQueryString }}, &{{ .QueryString.GoName | camelCase }}{{ end }}{{ if .IsMultipart }}, req{{ end }}{{ if .IsFormUrlEncoded }}, req{{ end }})
 }
 {{ end }}
 func RegisterHandlers(router Router, si ServerInterface) {

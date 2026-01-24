@@ -1,10 +1,13 @@
 {
-  "$id": "https://schemas.kolasiak.pl/eugene-config/v1.0.0",
+  "$id": "https://schemas.kolasiak.pl/eugene-config/v1.0.1",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Eugene Configuration",
   "description": "Configuration schema for Eugene OpenAPI Interface Kit - oink! 🐷",
   "type": "object",
-  "required": ["spec", "go"],
+  "required": [
+    "spec",
+    "go"
+  ],
   "properties": {
     "spec": {
       "type": "string",
@@ -45,7 +48,10 @@
     "go": {
       "type": "object",
       "description": "Go-specific generation options",
-      "required": ["output-dir", "package"],
+      "required": [
+        "output-dir",
+        "package"
+      ],
       "properties": {
         "output-dir": {
           "type": "string",
@@ -58,7 +64,11 @@
         "server-framework": {
           "type": "string",
           "description": "Server framework for generated server code",
-          "enum": ["echo", "chi", "stdlib"],
+          "enum": [
+            "echo",
+            "chi",
+            "stdlib"
+          ],
           "default": "echo"
         },
         "types": {
@@ -68,20 +78,40 @@
             "enum-strategy": {
               "type": "string",
               "description": "Enum generation strategy",
-              "enum": ["const", "type", "struct"],
+              "enum": [
+                "const",
+                "type",
+                "struct"
+              ],
               "default": "const"
             },
             "uuid-package": {
               "type": "string",
               "description": "UUID type handling",
-              "enum": ["string", "google", "gofrs"],
+              "enum": [
+                "string",
+                "google",
+                "gofrs"
+              ],
               "default": "string"
             },
             "nullable-strategy": {
               "type": "string",
               "description": "Nullable field strategy",
-              "enum": ["pointer", "nullable"],
+              "enum": [
+                "pointer",
+                "nullable"
+              ],
               "default": "pointer"
+            },
+            "allof-strategy": {
+              "type": "string",
+              "description": "AllOf composition strategy: embed (default) uses Go struct embedding, flatten inlines all properties",
+              "enum": [
+                "embed",
+                "flatten"
+              ],
+              "default": "embed"
             }
           },
           "additionalProperties": false
@@ -117,9 +147,18 @@
           "description": "Code generation targets (types, server, client, spec, strict-server, or all)",
           "items": {
             "type": "string",
-            "enum": ["types", "server", "client", "spec", "strict-server", "all"]
+            "enum": [
+              "types",
+              "server",
+              "client",
+              "spec",
+              "strict-server",
+              "all"
+            ]
           },
-          "default": ["all"]
+          "default": [
+            "all"
+          ]
         }
       },
       "additionalProperties": false

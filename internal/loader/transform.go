@@ -26,6 +26,15 @@ func Transform(result *Result) (*model.Spec, error) {
 		}
 	}
 
+	if doc.Components != nil && doc.Components.Responses != nil {
+		for name, resp := range doc.Components.Responses.FromOldest() {
+			schema := extractResponseSchema(name, resp)
+			if schema != nil && !schemaExists(spec.Schemas, schema.Name) {
+				spec.Schemas = append(spec.Schemas, *schema)
+			}
+		}
+	}
+
 	if doc.Paths != nil {
 		for pathStr, pathItem := range doc.Paths.PathItems.FromOldest() {
 			path, ops := transformPath(pathStr, pathItem)
@@ -337,9 +346,13 @@ func transformSchema(name string, s *base.Schema) *model.Schema {
 
 	if s.Properties != nil {
 		for propName, propProxy := range s.Properties.FromOldest() {
+			propSchema := transformSchemaProxy(propProxy)
+			if propSchema != nil && propSchema.Name == "" {
+				propSchema.Name = propName
+			}
 			prop := model.Property{
 				Name:   propName,
-				Schema: transformSchema(propName, propProxy.Schema()),
+				Schema: propSchema,
 			}
 			schema.Properties = append(schema.Properties, prop)
 		}
@@ -558,6 +571,38 @@ func transformOAuthFlow(flow *v3.OAuthFlow) *model.OAuthFlow {
 	}
 
 	return f
+}
+
+func extractResponseSchema(name string, resp *v3.Response) *model.Schema {
+	if resp == nil || resp.Content == nil {
+		return nil
+	}
+
+	for _, content := range resp.Content.FromOldest() {
+		if content.Schema == nil {
+			continue
+		}
+
+		ref := content.Schema.GetReference()
+		if ref != "" {
+			return &model.Schema{
+				Name: name,
+				Ref:  ref,
+			}
+		}
+
+		return transformSchema(name, content.Schema.Schema())
+	}
+	return nil
+}
+
+func schemaExists(schemas []model.Schema, name string) bool {
+	for _, s := range schemas {
+		if s.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func boolPtr(b *bool) bool {

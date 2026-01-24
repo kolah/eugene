@@ -77,6 +77,7 @@ Go Flags:
       --enum-strategy string       Enum strategy: const, type, struct
       --uuid-package string        UUID type: string, google, gofrs
       --nullable-strategy string   Nullable strategy: pointer, nullable
+      --allof-strategy string      AllOf strategy: embed, flatten
       --enable-yaml-tags           Generate yaml tags alongside json tags
       --additional-initialisms     Custom initialisms for naming (e.g., GTIN,SKU)
 ```
@@ -115,6 +116,7 @@ go:
     enum-strategy: const      # const, type, or struct
     uuid-package: google      # string, google, or gofrs
     nullable-strategy: pointer # pointer or nullable
+    allof-strategy: embed      # embed or flatten
 
   output-options:
     enable-yaml-tags: true
@@ -268,6 +270,27 @@ var (
     PetStatusAvailable = PetStatus{value: "available"}
     PetStatusPending   = PetStatus{value: "pending"}
 )
+```
+
+## AllOf Strategies
+
+### `embed` (default)
+Uses Go struct embedding for allOf compositions when all components are references:
+```go
+type Employee struct {
+    Person     // embedded
+    EmployeeID string `json:"employee_id"`
+}
+```
+
+### `flatten`
+Merges all properties from allOf schemas into a single flat struct:
+```go
+type Employee struct {
+    Name       string `json:"name"`        // from Person
+    Email      string `json:"email"`       // from Person
+    EmployeeID string `json:"employee_id"`
+}
 ```
 
 ## Union Types (oneOf/anyOf)

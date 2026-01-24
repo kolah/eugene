@@ -38,16 +38,16 @@ type ErrorResponse struct {
 type Status string
 
 type NewResource struct {
-	Name        string             `json:"name"`
-	Status      *NewResourceStatus `json:"status,omitempty"`
-	Description *string            `json:"description,omitempty"`
+	Name        string  `json:"name"`
+	Status      *Status `json:"status,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 type Resource struct {
-	ID          *string         `json:"id,omitempty"`
-	Name        *string         `json:"name,omitempty"`
-	Status      *ResourceStatus `json:"status,omitempty"`
-	Description *string         `json:"description,omitempty"`
+	ID          *string `json:"id,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Status      *Status `json:"status,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 type SessionInfo struct {
@@ -75,22 +75,6 @@ type Rectangle struct {
 type EchoPayloadNested struct {
 	Value *string `json:"value,omitempty"`
 }
-type NewResourceStatus string
-
-const (
-	NewResourceStatusPending   NewResourceStatus = "pending"
-	NewResourceStatusActive    NewResourceStatus = "active"
-	NewResourceStatusCompleted NewResourceStatus = "completed"
-)
-
-type ResourceStatus string
-
-const (
-	ResourceStatusPending   ResourceStatus = "pending"
-	ResourceStatusActive    ResourceStatus = "active"
-	ResourceStatusCompleted ResourceStatus = "completed"
-)
-
 type Shape struct {
 	Type string          `json:"-"`
 	Raw  json.RawMessage `json:"-"`

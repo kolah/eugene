@@ -6,27 +6,10 @@ type Status string
 type Priority int
 
 type Item struct {
-	ID       *string       `json:"id,omitempty"`
-	Status   *ItemStatus   `json:"status,omitempty"`
-	Priority *ItemPriority `json:"priority,omitempty"`
+	ID       *string   `json:"id,omitempty"`
+	Status   *Status   `json:"status,omitempty"`
+	Priority *Priority `json:"priority,omitempty"`
 }
-
-type ItemStatus string
-
-const (
-	ItemStatusPending   ItemStatus = "pending"
-	ItemStatusActive    ItemStatus = "active"
-	ItemStatusCompleted ItemStatus = "completed"
-	ItemStatusCancelled ItemStatus = "cancelled"
-)
-
-type ItemPriority int
-
-const (
-	ItemPriority1 ItemPriority = 1
-	ItemPriority2 ItemPriority = 2
-	ItemPriority3 ItemPriority = 3
-)
 
 const (
 	StatusPending   Status = "pending"

@@ -5,11 +5,28 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+{{- if .TimeImport }}
+	"time"
+{{- end }}
+{{- if .UUIDImport }}
+
+	"{{ .UUIDImport }}"
+{{- end }}
 )
+{{- range $enum := .InlineEnums }}
+
+type {{ $enum.Name }} string
+
+const (
+{{- range $enum.Values }}
+	{{ $enum.Name }}{{ . | pascalCase }} {{ $enum.Name }} = "{{ . }}"
+{{- end }}
+)
+{{- end }}
 
 {{- /* Generate request types for each operation */ -}}
 {{ range .Operations }}
-{{- if or .PathParams .QueryParams .HeaderParams .RequestBody }}
+{{- if or .PathParams .QueryParams .HeaderParams .QueryString .RequestBody }}
 // {{ .ID }}RequestObject represents the request for {{ .ID }}.
 type {{ .ID }}RequestObject struct {
 {{- range .PathParams }}
@@ -17,6 +34,9 @@ type {{ .ID }}RequestObject struct {
 {{- end }}
 {{- range .QueryParams }}
 	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }} // query parameter
+{{- end }}
+{{- if .QueryString }}
+	{{ .QueryString.GoName }} {{ .QueryString.Type }} // querystring (OpenAPI 3.2)
 {{- end }}
 {{- range .HeaderParams }}
 	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }} // header parameter
@@ -74,6 +94,6 @@ func (r {{ $op.ID }}{{ .StatusCode }}Response) Visit{{ $op.ID }}ResponseObject(w
 type StrictServerInterface interface {
 {{- range .Operations }}
 	// {{ .ID }}{{ if .Summary }} - {{ .Summary }}{{ end }}
-	{{ .ID }}(ctx context.Context{{ if or .PathParams .QueryParams .HeaderParams .RequestBody }}, request {{ .ID }}RequestObject{{ end }}) ({{ .ID }}ResponseObject, error)
+	{{ .ID }}(ctx context.Context{{ if or .PathParams .QueryParams .HeaderParams .QueryString .RequestBody }}, request {{ .ID }}RequestObject{{ end }}) ({{ .ID }}ResponseObject, error)
 {{- end }}
 }

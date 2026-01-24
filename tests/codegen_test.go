@@ -223,6 +223,13 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 			outputDir:       "generated/errors",
 			specFile:        "testdata/specs/responses/errors.yaml",
 		},
+		// Response schemas test
+		{
+			name:      "response_schemas",
+			targets:   []string{"types"},
+			outputDir: "generated/response_schemas",
+			specFile:  "testdata/specs/responses/response-schemas.yaml",
+		},
 		// Security test
 		{
 			name:            "security",

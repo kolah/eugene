@@ -53,13 +53,17 @@ func (w *Writer) SendRaw(eventType string, data []byte) error {
 	return nil
 }
 
+type ListItemsQueryParams struct {
+	Filter *string `query:"filter"`
+}
+
 type ServerInterface interface {
 	// SearchItems - Search using QUERY method
 	SearchItems(ctx echo.Context) error
 	// StreamEvents - Stream events via SSE (streaming)
 	StreamEvents(ctx echo.Context) error
 	// ListItems - List items with query parameter
-	ListItems(ctx echo.Context) error
+	ListItems(ctx echo.Context, params ListItemsQueryParams) error
 	// StreamSse - Stream data via SSE with itemSchema (streaming)
 	StreamSse(ctx echo.Context) error
 	// StreamJsonl - Stream data via JSON Lines
@@ -81,7 +85,11 @@ func (w *ServerInterfaceWrapper) StreamEvents(ctx echo.Context) error {
 }
 
 func (w *ServerInterfaceWrapper) ListItems(ctx echo.Context) error {
-	return w.Handler.ListItems(ctx)
+	var params ListItemsQueryParams
+	if err := ctx.Bind(&params); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	}
+	return w.Handler.ListItems(ctx, params)
 }
 
 func (w *ServerInterfaceWrapper) StreamSse(ctx echo.Context) error {

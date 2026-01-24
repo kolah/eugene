@@ -2,12 +2,18 @@
 package gen
 
 import (
+	"net/http"
+
 	"github.com/labstack/echo/v4"
 )
 
+type ListItemsQueryParams struct {
+	Limit *int `query:"limit"`
+}
+
 type ServerInterface interface {
 	// ListItems
-	ListItems(ctx echo.Context) error
+	ListItems(ctx echo.Context, params ListItemsQueryParams) error
 	// CreateItem
 	CreateItem(ctx echo.Context) error
 	// GetItem
@@ -23,7 +29,11 @@ type ServerInterfaceWrapper struct {
 }
 
 func (w *ServerInterfaceWrapper) ListItems(ctx echo.Context) error {
-	return w.Handler.ListItems(ctx)
+	var params ListItemsQueryParams
+	if err := ctx.Bind(&params); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	}
+	return w.Handler.ListItems(ctx, params)
 }
 
 func (w *ServerInterfaceWrapper) CreateItem(ctx echo.Context) error {

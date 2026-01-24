@@ -52,13 +52,17 @@ func (w *Writer) SendRaw(eventType string, data []byte) error {
 	return nil
 }
 
+type ListItemsQueryParams struct {
+	Filter *string
+}
+
 type ServerInterface interface {
 	// SearchItems - Search using QUERY method
 	SearchItems(w http.ResponseWriter, r *http.Request)
 	// StreamEvents - Stream events via SSE (streaming)
 	StreamEvents(w http.ResponseWriter, r *http.Request)
 	// ListItems - List items with query parameter
-	ListItems(w http.ResponseWriter, r *http.Request)
+	ListItems(w http.ResponseWriter, r *http.Request, params ListItemsQueryParams)
 	// StreamSse - Stream data via SSE with itemSchema (streaming)
 	StreamSse(w http.ResponseWriter, r *http.Request)
 	// StreamJsonl - Stream data via JSON Lines
@@ -80,7 +84,11 @@ func (w *ServerInterfaceWrapper) StreamEvents(rw http.ResponseWriter, r *http.Re
 }
 
 func (w *ServerInterfaceWrapper) ListItems(rw http.ResponseWriter, r *http.Request) {
-	w.Handler.ListItems(rw, r)
+	var params ListItemsQueryParams
+	if v := r.URL.Query().Get("filter"); v != "" {
+		params.Filter = &v
+	}
+	w.Handler.ListItems(rw, r, params)
 }
 
 func (w *ServerInterfaceWrapper) StreamSse(rw http.ResponseWriter, r *http.Request) {

@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://schemas.kolasiak.pl/eugene-config/latest
+# yaml-language-server: $schema=https://schemas.kolasiak.pl/eugene-config/v1.0.1
 
 # Path to the OpenAPI specification file
 spec: ./api/openapi.yaml
@@ -48,6 +48,7 @@ go:
     uuid-package: string
     # Nullable field strategy: pointer or nullable
     nullable-strategy: pointer
+    allof-strategy: embed
 
   # Output options
   output-options:

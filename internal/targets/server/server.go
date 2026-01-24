@@ -3,6 +3,8 @@ package server
 import (
 	"fmt"
 
+	"github.com/kolah/eugene/internal/config"
+	"github.com/kolah/eugene/internal/golang"
 	"github.com/kolah/eugene/internal/model"
 	"github.com/kolah/eugene/internal/templates"
 )
@@ -35,18 +37,27 @@ func New(frameworkName string) (*Target, error) {
 type serverFeatures struct {
 	HasStreaming      bool // any operation uses SSE
 	HasQueryString    bool // any operation uses querystring param (OpenAPI 3.2)
+	HasQueryParams    bool // any operation uses in: query params
 	HasCallbacks      bool // any operation defines callbacks
 	HasMultipart      bool // any operation uses multipart/form-data
 	HasFormUrlEncoded bool // any operation uses application/x-www-form-urlencoded
 }
 
 type templateData struct {
-	Package    string
-	Operations []operationData
-	Framework  string
-	Tags       []tagData // OpenAPI 3.2: hierarchical tags
-	Features   serverFeatures
-	Callbacks  []callbackData
+	Package     string
+	Operations  []operationData
+	Framework   string
+	Tags        []tagData // OpenAPI 3.2: hierarchical tags
+	Features    serverFeatures
+	Callbacks   []callbackData
+	UUIDImport  string
+	TimeImport  bool
+	InlineEnums []inlineEnumData
+}
+
+type inlineEnumData struct {
+	Name   string
+	Values []string
 }
 
 type callbackData struct {
@@ -77,12 +88,14 @@ type operationData struct {
 	Summary          string
 	Description      string
 	Tags             []string
-	Parameters       []parameterData
+	Parameters       []parameterData // path params only
+	QueryParams      []parameterData // in: query params
 	QueryString      *querystringData // OpenAPI 3.2: in: querystring
 	RequestBody      *requestBodyData
 	Responses        []responseData
 	Streaming        *streamingData // SSE/streaming
 	HasBody          bool
+	HasQueryParams   bool
 	HasQueryString   bool
 	IsStreaming      bool
 	IsMultipart      bool
@@ -134,10 +147,12 @@ type responseData struct {
 	Type        string
 }
 
-func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string) (string, error) {
+func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string, cfg *config.TypesConfig, registry *golang.EnumRegistry) (string, error) {
+	resolver := golang.NewTypeResolverWithRegistry(cfg, nil, registry)
 	data := templateData{
-		Package:   pkg,
-		Framework: t.framework.Name(),
+		Package:    pkg,
+		Framework:  t.framework.Name(),
+		UUIDImport: resolver.UUIDImport(),
 	}
 
 	for _, op := range spec.Operations {
@@ -161,23 +176,30 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string)
 		}
 
 		for _, p := range op.Parameters {
-			if p.In == model.LocationQueryString {
-				// OpenAPI 3.2: querystring parameter
+			paramType := schemaToGoType(p.Schema, resolver, op.ID, p.Name)
+			pd := parameterData{
+				Name:        p.Name,
+				GoName:      golang.PascalCase(p.Name),
+				In:          string(p.In),
+				Description: p.Description,
+				Required:    p.Required,
+				Type:        paramType,
+			}
+
+			switch p.In {
+			case model.LocationQueryString:
 				opData.QueryString = &querystringData{
 					Name:   p.Name,
-					GoName: toGoParamName(p.Name),
-					Type:   schemaToGoType(p.Schema),
+					GoName: golang.PascalCase(p.Name),
+					Type:   paramType,
 				}
 				opData.HasQueryString = true
-			} else {
-				opData.Parameters = append(opData.Parameters, parameterData{
-					Name:        p.Name,
-					GoName:      toGoParamName(p.Name),
-					In:          string(p.In),
-					Description: p.Description,
-					Required:    p.Required,
-					Type:        schemaToGoType(p.Schema),
-				})
+			case model.LocationQuery:
+				opData.QueryParams = append(opData.QueryParams, pd)
+				opData.HasQueryParams = true
+				data.Features.HasQueryParams = true
+			case model.LocationPath:
+				opData.Parameters = append(opData.Parameters, pd)
 			}
 		}
 
@@ -186,18 +208,18 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string)
 			if len(op.RequestBody.Content) > 0 {
 				content := op.RequestBody.Content[0]
 				rb.MediaType = content.MediaType
-				rb.Type = schemaToGoType(content.Schema)
+				rb.Type = schemaToGoType(content.Schema, resolver, "", "")
 
 				if content.MediaType == "multipart/form-data" {
 					rb.IsMultipart = true
 					opData.IsMultipart = true
 					data.Features.HasMultipart = true
-					rb.MultipartFields = extractMultipartFields(content.Schema, op.RequestBody.Required)
+					rb.MultipartFields = extractMultipartFields(content.Schema, op.RequestBody.Required, resolver)
 				} else if content.MediaType == "application/x-www-form-urlencoded" {
 					rb.IsFormUrlEncoded = true
 					opData.IsFormUrlEncoded = true
 					data.Features.HasFormUrlEncoded = true
-					rb.MultipartFields = extractFormUrlEncodedFields(content.Schema, op.RequestBody.Required)
+					rb.MultipartFields = extractFormUrlEncodedFields(content.Schema, op.RequestBody.Required, resolver)
 				}
 			}
 			opData.RequestBody = rb
@@ -210,7 +232,7 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string)
 			}
 			if len(r.Content) > 0 {
 				rd.MediaType = r.Content[0].MediaType
-				rd.Type = schemaToGoType(r.Content[0].Schema)
+				rd.Type = schemaToGoType(r.Content[0].Schema, resolver, "", "")
 			}
 			opData.Responses = append(opData.Responses, rd)
 		}
@@ -229,7 +251,7 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string)
 		for _, cb := range op.Callbacks {
 			cbData := callbackData{
 				Name:   cb.Name,
-				GoName: toGoParamName(cb.Name),
+				GoName: golang.PascalCase(cb.Name),
 			}
 			for _, cbOp := range cb.Operations {
 				cbOpData := callbackOperationData{
@@ -239,7 +261,7 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string)
 					cbOpData.RequestBody = &requestBodyData{
 						Required:  cbOp.RequestBody.Required,
 						MediaType: cbOp.RequestBody.Content[0].MediaType,
-						Type:      schemaToGoType(cbOp.RequestBody.Content[0].Schema),
+						Type:      schemaToGoType(cbOp.RequestBody.Content[0].Schema, resolver, "", ""),
 					}
 				}
 				for _, r := range cbOp.Responses {
@@ -249,7 +271,7 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string)
 					}
 					if len(r.Content) > 0 {
 						rd.MediaType = r.Content[0].MediaType
-						rd.Type = schemaToGoType(r.Content[0].Schema)
+						rd.Type = schemaToGoType(r.Content[0].Schema, resolver, "", "")
 					}
 					cbOpData.Responses = append(cbOpData.Responses, rd)
 				}
@@ -263,47 +285,55 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string)
 	// Build hierarchical tag data
 	data.Tags = buildTagData(spec.Tags)
 
+	// Collect nested types (inline enums) from resolver
+	for _, nested := range resolver.NestedTypes() {
+		if nested.IsEnum && nested.Schema != nil {
+			var values []string
+			for _, v := range nested.Schema.Enum {
+				if s, ok := v.(string); ok {
+					values = append(values, s)
+				}
+			}
+			data.InlineEnums = append(data.InlineEnums, inlineEnumData{
+				Name:   nested.Name,
+				Values: values,
+			})
+		}
+	}
+
+	// Check if time import is needed
+	for _, op := range data.Operations {
+		for _, p := range op.Parameters {
+			if p.Type == "time.Time" {
+				data.TimeImport = true
+				break
+			}
+		}
+		if data.TimeImport {
+			break
+		}
+	}
+
 	return engine.Execute(t.framework.TemplateName(), data)
 }
 
-func toGoParamName(name string) string {
-	result := ""
-	upper := true
-	for _, c := range name {
-		if c == '_' || c == '-' {
-			upper = true
-			continue
-		}
-		if upper {
-			result += string(toUpper(c))
-			upper = false
-		} else {
-			result += string(c)
-		}
-	}
-	return result
-}
-
-func toUpper(r rune) rune {
-	if r >= 'a' && r <= 'z' {
-		return r - 32
-	}
-	return r
-}
-
-func schemaToGoType(s *model.Schema) string {
+func schemaToGoType(s *model.Schema, resolver *golang.TypeResolver, operationID, paramName string) string {
 	if s == nil {
 		return "any"
 	}
 	if s.Ref != "" {
 		parts := splitRef(s.Ref)
 		if len(parts) > 0 {
-			return parts[len(parts)-1]
+			return golang.PascalCase(parts[len(parts)-1])
 		}
+	}
+	// Handle inline enums - generate type name from operation+param
+	if len(s.Enum) > 0 && operationID != "" && paramName != "" {
+		return resolver.ResolveType(s, golang.PascalCase(operationID), paramName)
 	}
 	switch s.Type {
 	case model.TypeString:
-		return "string"
+		return resolver.ResolveType(s, "", "")
 	case model.TypeInteger:
 		if s.Format == "int64" {
 			return "int64"
@@ -317,7 +347,7 @@ func schemaToGoType(s *model.Schema) string {
 	case model.TypeBoolean:
 		return "bool"
 	case model.TypeArray:
-		return "[]" + schemaToGoType(s.Items)
+		return "[]" + schemaToGoType(s.Items, resolver, "", "")
 	default:
 		return "any"
 	}
@@ -377,7 +407,7 @@ func buildTagData(tags []model.Tag) []tagData {
 	return result
 }
 
-func extractMultipartFields(schema *model.Schema, bodyRequired bool) []multipartFieldData {
+func extractMultipartFields(schema *model.Schema, bodyRequired bool, resolver *golang.TypeResolver) []multipartFieldData {
 	if schema == nil {
 		return nil
 	}
@@ -391,7 +421,7 @@ func extractMultipartFields(schema *model.Schema, bodyRequired bool) []multipart
 	for _, prop := range schema.Properties {
 		field := multipartFieldData{
 			Name:     prop.Name,
-			GoName:   toGoParamName(prop.Name),
+			GoName:   golang.PascalCase(prop.Name),
 			Required: requiredSet[prop.Name] && bodyRequired,
 		}
 
@@ -420,7 +450,7 @@ func extractMultipartFields(schema *model.Schema, bodyRequired bool) []multipart
 	return fields
 }
 
-func extractFormUrlEncodedFields(schema *model.Schema, bodyRequired bool) []multipartFieldData {
+func extractFormUrlEncodedFields(schema *model.Schema, bodyRequired bool, resolver *golang.TypeResolver) []multipartFieldData {
 	if schema == nil {
 		return nil
 	}
@@ -434,7 +464,7 @@ func extractFormUrlEncodedFields(schema *model.Schema, bodyRequired bool) []mult
 	for _, prop := range schema.Properties {
 		field := multipartFieldData{
 			Name:     prop.Name,
-			GoName:   toGoParamName(prop.Name),
+			GoName:   golang.PascalCase(prop.Name),
 			Required: requiredSet[prop.Name] && bodyRequired,
 		}
 

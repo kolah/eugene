@@ -34,6 +34,9 @@ func TestPascalCase(t *testing.T) {
 		{"userId", "UserID"},
 		{"CVV", "CVV"},
 		{"card_cvv", "CardCVV"},
+		{"UIContainer", "UIContainer"},
+		{"UINodeType", "UINodeType"},
+		{"HTMLParser", "HTMLParser"},
 	}
 
 	for _, tt := range tests {
@@ -61,6 +64,7 @@ func TestCamelCase(t *testing.T) {
 		{"A", "a"},
 		{"petId", "petID"},
 		{"UserId", "userID"},
+		{"UIContainer", "uiContainer"},
 	}
 
 	for _, tt := range tests {
@@ -79,7 +83,7 @@ func TestSnakeCase(t *testing.T) {
 		{"HelloWorld", "hello_world"},
 		{"helloWorld", "hello_world"},
 		{"hello_world", "hello_world"},
-		{"APIKey", "apikey"},
+		{"APIKey", "api_key"},
 		{"userID", "user_id"},
 		{"", ""},
 		{"a", "a"},

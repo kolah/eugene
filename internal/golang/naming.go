@@ -96,10 +96,11 @@ func SnakeCase(s string) string {
 }
 
 func splitWords(s string) []string {
+	runes := []rune(s)
 	var words []string
 	var current strings.Builder
 
-	for i, r := range s {
+	for i, r := range runes {
 		if r == '_' || r == '-' || r == ' ' || r == '.' {
 			if current.Len() > 0 {
 				words = append(words, current.String())
@@ -109,8 +110,13 @@ func splitWords(s string) []string {
 		}
 
 		if unicode.IsUpper(r) && i > 0 {
-			prev := rune(s[i-1])
+			prev := runes[i-1]
 			if unicode.IsLower(prev) || unicode.IsDigit(prev) {
+				if current.Len() > 0 {
+					words = append(words, current.String())
+					current.Reset()
+				}
+			} else if unicode.IsUpper(prev) && i+1 < len(runes) && unicode.IsLower(runes[i+1]) {
 				if current.Len() > 0 {
 					words = append(words, current.String())
 					current.Reset()

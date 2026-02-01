@@ -10,8 +10,22 @@ import (
 	"go.yaml.in/yaml/v4"
 )
 
+type transformer struct {
+	componentSchemas map[*base.Schema]string
+}
+
 func Transform(result *Result) (*model.Spec, error) {
 	doc := result.Document.Model
+
+	t := &transformer{
+		componentSchemas: make(map[*base.Schema]string),
+	}
+
+	if doc.Components != nil && doc.Components.Schemas != nil {
+		for name, schemaProxy := range doc.Components.Schemas.FromOldest() {
+			t.componentSchemas[schemaProxy.Schema()] = "#/components/schemas/" + name
+		}
+	}
 
 	spec := &model.Spec{
 		Info:    transformInfo(doc.Info),
@@ -21,14 +35,14 @@ func Transform(result *Result) (*model.Spec, error) {
 
 	if doc.Components != nil && doc.Components.Schemas != nil {
 		for name, schemaProxy := range doc.Components.Schemas.FromOldest() {
-			schema := transformSchema(name, schemaProxy.Schema())
+			schema := t.transformSchema(name, schemaProxy.Schema())
 			spec.Schemas = append(spec.Schemas, *schema)
 		}
 	}
 
 	if doc.Components != nil && doc.Components.Responses != nil {
 		for name, resp := range doc.Components.Responses.FromOldest() {
-			schema := extractResponseSchema(name, resp)
+			schema := t.extractResponseSchema(name, resp)
 			if schema != nil && !schemaExists(spec.Schemas, schema.Name) {
 				spec.Schemas = append(spec.Schemas, *schema)
 			}
@@ -37,7 +51,7 @@ func Transform(result *Result) (*model.Spec, error) {
 
 	if doc.Paths != nil {
 		for pathStr, pathItem := range doc.Paths.PathItems.FromOldest() {
-			path, ops := transformPath(pathStr, pathItem)
+			path, ops := t.transformPath(pathStr, pathItem)
 			spec.Paths = append(spec.Paths, path)
 			spec.Operations = append(spec.Operations, ops...)
 		}
@@ -88,7 +102,7 @@ func transformTags(tags []*base.Tag) []model.Tag {
 	return result
 }
 
-func transformPath(pathStr string, pathItem *v3.PathItem) (model.Path, []model.Operation) {
+func (t *transformer) transformPath(pathStr string, pathItem *v3.PathItem) (model.Path, []model.Operation) {
 	path := model.Path{Path: pathStr}
 	var ops []model.Operation
 
@@ -112,7 +126,7 @@ func transformPath(pathStr string, pathItem *v3.PathItem) (model.Path, []model.O
 		if m.op == nil {
 			continue
 		}
-		operation := transformOperation(m.method, pathStr, m.op)
+		operation := t.transformOperation(m.method, pathStr, m.op)
 		ops = append(ops, operation)
 		path.Operations = append(path.Operations, operation)
 	}
@@ -120,7 +134,7 @@ func transformPath(pathStr string, pathItem *v3.PathItem) (model.Path, []model.O
 	return path, ops
 }
 
-func transformOperation(method model.Method, path string, op *v3.Operation) model.Operation {
+func (t *transformer) transformOperation(method model.Method, path string, op *v3.Operation) model.Operation {
 	operation := model.Operation{
 		ID:          op.OperationId,
 		Method:      method,
@@ -132,16 +146,16 @@ func transformOperation(method model.Method, path string, op *v3.Operation) mode
 	}
 
 	for _, p := range op.Parameters {
-		operation.Parameters = append(operation.Parameters, transformParameter(p))
+		operation.Parameters = append(operation.Parameters, t.transformParameter(p))
 	}
 
 	if op.RequestBody != nil {
-		operation.RequestBody = transformRequestBody(op.RequestBody)
+		operation.RequestBody = t.transformRequestBody(op.RequestBody)
 	}
 
 	if op.Responses != nil && op.Responses.Codes != nil {
 		for code, resp := range op.Responses.Codes.FromOldest() {
-			response := transformResponse(code, resp)
+			response := t.transformResponse(code, resp)
 			operation.Responses = append(operation.Responses, response)
 
 			// Detect SSE/streaming responses
@@ -174,12 +188,12 @@ func transformOperation(method model.Method, path string, op *v3.Operation) mode
 		}
 	}
 
-	operation.Callbacks = transformCallbacks(op.Callbacks)
+	operation.Callbacks = t.transformCallbacks(op.Callbacks)
 
 	return operation
 }
 
-func transformCallbacks(callbacks *orderedmap.Map[string, *v3.Callback]) []model.Callback {
+func (t *transformer) transformCallbacks(callbacks *orderedmap.Map[string, *v3.Callback]) []model.Callback {
 	if callbacks == nil {
 		return nil
 	}
@@ -188,14 +202,14 @@ func transformCallbacks(callbacks *orderedmap.Map[string, *v3.Callback]) []model
 		callback := model.Callback{Name: name}
 		for expr, pathItem := range cb.Expression.FromOldest() {
 			callback.Expression = expr
-			callback.Operations = append(callback.Operations, transformCallbackOperations(pathItem)...)
+			callback.Operations = append(callback.Operations, t.transformCallbackOperations(pathItem)...)
 		}
 		result = append(result, callback)
 	}
 	return result
 }
 
-func transformCallbackOperations(pathItem *v3.PathItem) []model.CallbackOperation {
+func (t *transformer) transformCallbackOperations(pathItem *v3.PathItem) []model.CallbackOperation {
 	var ops []model.CallbackOperation
 	methods := []struct {
 		method model.Method
@@ -216,11 +230,11 @@ func transformCallbackOperations(pathItem *v3.PathItem) []model.CallbackOperatio
 		}
 		cbOp := model.CallbackOperation{Method: m.method}
 		if m.op.RequestBody != nil {
-			cbOp.RequestBody = transformRequestBody(m.op.RequestBody)
+			cbOp.RequestBody = t.transformRequestBody(m.op.RequestBody)
 		}
 		if m.op.Responses != nil && m.op.Responses.Codes != nil {
 			for code, resp := range m.op.Responses.Codes.FromOldest() {
-				cbOp.Responses = append(cbOp.Responses, transformResponse(code, resp))
+				cbOp.Responses = append(cbOp.Responses, t.transformResponse(code, resp))
 			}
 		}
 		ops = append(ops, cbOp)
@@ -228,7 +242,7 @@ func transformCallbackOperations(pathItem *v3.PathItem) []model.CallbackOperatio
 	return ops
 }
 
-func transformParameter(p *v3.Parameter) model.Parameter {
+func (t *transformer) transformParameter(p *v3.Parameter) model.Parameter {
 	param := model.Parameter{
 		Name:        p.Name,
 		In:          model.ParameterLocation(strings.ToLower(p.In)),
@@ -238,12 +252,12 @@ func transformParameter(p *v3.Parameter) model.Parameter {
 	}
 
 	if p.Schema != nil {
-		param.Schema = transformSchemaProxy(p.Schema)
+		param.Schema = t.transformSchemaProxy(p.Schema)
 	} else if p.Content != nil {
 		// OpenAPI 3.2: querystring parameters use content instead of schema
 		for _, content := range p.Content.FromOldest() {
 			if content.Schema != nil {
-				param.Schema = transformSchemaProxy(content.Schema)
+				param.Schema = t.transformSchemaProxy(content.Schema)
 				break
 			}
 		}
@@ -252,7 +266,7 @@ func transformParameter(p *v3.Parameter) model.Parameter {
 	return param
 }
 
-func transformRequestBody(rb *v3.RequestBody) *model.RequestBody {
+func (t *transformer) transformRequestBody(rb *v3.RequestBody) *model.RequestBody {
 	body := &model.RequestBody{
 		Description: rb.Description,
 		Required:    boolPtr(rb.Required),
@@ -262,7 +276,7 @@ func transformRequestBody(rb *v3.RequestBody) *model.RequestBody {
 		for mediaType, content := range rb.Content.FromOldest() {
 			mtc := model.MediaTypeContent{MediaType: mediaType}
 			if content.Schema != nil {
-				mtc.Schema = transformSchemaProxy(content.Schema)
+				mtc.Schema = t.transformSchemaProxy(content.Schema)
 			}
 			body.Content = append(body.Content, mtc)
 		}
@@ -271,7 +285,7 @@ func transformRequestBody(rb *v3.RequestBody) *model.RequestBody {
 	return body
 }
 
-func transformResponse(code string, resp *v3.Response) model.Response {
+func (t *transformer) transformResponse(code string, resp *v3.Response) model.Response {
 	response := model.Response{
 		StatusCode:  code,
 		Description: resp.Description,
@@ -281,7 +295,7 @@ func transformResponse(code string, resp *v3.Response) model.Response {
 		for mediaType, content := range resp.Content.FromOldest() {
 			mtc := model.MediaTypeContent{MediaType: mediaType}
 			if content.Schema != nil {
-				mtc.Schema = transformSchemaProxy(content.Schema)
+				mtc.Schema = t.transformSchemaProxy(content.Schema)
 			}
 			response.Content = append(response.Content, mtc)
 		}
@@ -295,7 +309,7 @@ func transformResponse(code string, resp *v3.Response) model.Response {
 				Required:    header.Required,
 			}
 			if header.Schema != nil {
-				h.Schema = transformSchemaProxy(header.Schema)
+				h.Schema = t.transformSchemaProxy(header.Schema)
 			}
 			response.Headers = append(response.Headers, h)
 		}
@@ -304,20 +318,26 @@ func transformResponse(code string, resp *v3.Response) model.Response {
 	return response
 }
 
-func transformSchemaProxy(proxy *base.SchemaProxy) *model.Schema {
+func (t *transformer) transformSchemaProxy(proxy *base.SchemaProxy) *model.Schema {
 	if proxy == nil {
 		return nil
 	}
 
 	ref := proxy.GetReference()
-	schema := transformSchema("", proxy.Schema())
+	if ref == "" {
+		if resolved, ok := t.componentSchemas[proxy.Schema()]; ok {
+			return &model.Schema{Ref: resolved}
+		}
+	}
+
+	schema := t.transformSchema("", proxy.Schema())
 	if schema != nil && ref != "" {
 		schema.Ref = ref
 	}
 	return schema
 }
 
-func transformSchema(name string, s *base.Schema) *model.Schema {
+func (t *transformer) transformSchema(name string, s *base.Schema) *model.Schema {
 	if s == nil {
 		return nil
 	}
@@ -346,7 +366,7 @@ func transformSchema(name string, s *base.Schema) *model.Schema {
 
 	if s.Properties != nil {
 		for propName, propProxy := range s.Properties.FromOldest() {
-			propSchema := transformSchemaProxy(propProxy)
+			propSchema := t.transformSchemaProxy(propProxy)
 			if propSchema != nil && propSchema.Name == "" {
 				propSchema.Name = propName
 			}
@@ -361,21 +381,21 @@ func transformSchema(name string, s *base.Schema) *model.Schema {
 	schema.Required = s.Required
 
 	if s.Items != nil && s.Items.A != nil {
-		schema.Items = transformSchemaProxy(s.Items.A)
+		schema.Items = t.transformSchemaProxy(s.Items.A)
 	}
 
 	if s.AdditionalProperties != nil && s.AdditionalProperties.A != nil {
-		schema.AdditionalProperties = transformSchemaProxy(s.AdditionalProperties.A)
+		schema.AdditionalProperties = t.transformSchemaProxy(s.AdditionalProperties.A)
 	}
 
 	for _, proxy := range s.AllOf {
-		schema.AllOf = append(schema.AllOf, transformSchemaProxy(proxy))
+		schema.AllOf = append(schema.AllOf, t.transformSchemaProxy(proxy))
 	}
 	for _, proxy := range s.OneOf {
-		schema.OneOf = append(schema.OneOf, transformSchemaProxy(proxy))
+		schema.OneOf = append(schema.OneOf, t.transformSchemaProxy(proxy))
 	}
 	for _, proxy := range s.AnyOf {
-		schema.AnyOf = append(schema.AnyOf, transformSchemaProxy(proxy))
+		schema.AnyOf = append(schema.AnyOf, t.transformSchemaProxy(proxy))
 	}
 
 	if s.Discriminator != nil {
@@ -573,7 +593,7 @@ func transformOAuthFlow(flow *v3.OAuthFlow) *model.OAuthFlow {
 	return f
 }
 
-func extractResponseSchema(name string, resp *v3.Response) *model.Schema {
+func (t *transformer) extractResponseSchema(name string, resp *v3.Response) *model.Schema {
 	if resp == nil || resp.Content == nil {
 		return nil
 	}
@@ -591,7 +611,7 @@ func extractResponseSchema(name string, resp *v3.Response) *model.Schema {
 			}
 		}
 
-		return transformSchema(name, content.Schema.Schema())
+		return t.transformSchema(name, content.Schema.Schema())
 	}
 	return nil
 }

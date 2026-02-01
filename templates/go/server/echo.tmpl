@@ -130,7 +130,7 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 {{- end }}
 {{- if .HasQueryParams }}
 	var params {{ .ID | pascalCase }}QueryParams
-	if err := ctx.Bind(&params); err != nil {
+	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
 	}
 {{- end }}

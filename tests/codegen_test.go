@@ -193,6 +193,13 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 			outputDir:       "generated/params",
 			specFile:        "testdata/specs/parameters/all-param-types.yaml",
 		},
+		{
+			name:            "post_query_params",
+			targets:         []string{"types", "server"},
+			serverFramework: "echo",
+			outputDir:       "generated/post_query_params",
+			specFile:        "testdata/specs/parameters/post-query-params.yaml",
+		},
 		// Content type tests
 		{
 			name:            "multipart",

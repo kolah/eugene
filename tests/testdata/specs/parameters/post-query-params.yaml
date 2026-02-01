@@ -1,0 +1,68 @@
+openapi: "3.0.3"
+info:
+  title: POST with Query Parameters Test
+  version: "1.0.0"
+paths:
+  /search:
+    get:
+      operationId: searchItems
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResult"
+    post:
+      operationId: createSearch
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResult"
+components:
+  schemas:
+    SearchRequest:
+      type: object
+      properties:
+        filters:
+          type: array
+          items:
+            type: string
+    SearchResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+        total:
+          type: integer

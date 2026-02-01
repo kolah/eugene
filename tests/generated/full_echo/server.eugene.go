@@ -30,7 +30,7 @@ type ServerInterfaceWrapper struct {
 
 func (w *ServerInterfaceWrapper) ListItems(ctx echo.Context) error {
 	var params ListItemsQueryParams
-	if err := ctx.Bind(&params); err != nil {
+	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
 	}
 	return w.Handler.ListItems(ctx, params)

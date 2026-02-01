@@ -24,7 +24,7 @@ type ServerInterfaceWrapper struct {
 func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 	id := ctx.Param("id")
 	var params GetItemQueryParams
-	if err := ctx.Bind(&params); err != nil {
+	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
 	}
 	return w.Handler.GetItem(ctx, id, params)

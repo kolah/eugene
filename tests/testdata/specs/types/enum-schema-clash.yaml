@@ -1,0 +1,34 @@
+openapi: "3.0.3"
+info:
+  title: Enum Schema Name Clash Test
+  version: "1.0.0"
+paths:
+  /notifications:
+    get:
+      operationId: listNotifications
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+components:
+  schemas:
+    NotificationType:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        notification_type:
+          type: string
+          enum: [email, sms, push]

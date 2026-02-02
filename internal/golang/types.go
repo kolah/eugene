@@ -197,17 +197,10 @@ type UnionVariant struct {
 
 // NewTypeResolver creates a new TypeResolver with the given configuration.
 func NewTypeResolver(cfg *config.TypesConfig) *TypeResolver {
-	return NewTypeResolverWithImportMapping(cfg, nil)
-}
-
-// NewTypeResolverWithImportMapping creates a TypeResolver with import mapping support.
-func NewTypeResolverWithImportMapping(cfg *config.TypesConfig, importMapping map[string]string) *TypeResolver {
 	return &TypeResolver{
-		cfg:           cfg,
-		importMapping: importMapping,
-		seen:          make(map[string]bool),
-		enumValues:    make(map[string]string),
-		mappedImports: make(map[string]bool),
+		cfg:        cfg,
+		seen:       make(map[string]bool),
+		enumValues: make(map[string]string),
 	}
 }
 

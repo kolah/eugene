@@ -42,19 +42,20 @@ type operationData struct {
 	Method           string
 	Path             string
 	Summary          string
-	Description      string
 	PathParams       []parameterData
 	QueryParams      []parameterData
 	HeaderParams     []parameterData
-	QueryStringParam *parameterData // OpenAPI 3.2: in: querystring
+	QueryStringParam *parameterData
 	RequestBody      *requestBodyData
-	SuccessResponse  *responseData   // kept for backward compat
-	Responses        []responseData  // all responses with status codes
-	Streaming        *streamingData  // SSE streaming
+	Responses        []responseData
+	Streaming        *streamingData
+	ResponseTypeName string
+	RequestTypeName  string
+	ParamsTypeName   string
 	HasPathParams    bool
 	HasQueryParams   bool
 	HasHeaderParams  bool
-	HasQueryString   bool // OpenAPI 3.2: in: querystring
+	HasQueryString   bool
 	HasBody          bool
 	IsStreaming      bool
 	IsMultipart      bool
@@ -99,14 +100,36 @@ type responseData struct {
 func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string) (string, error) {
 	data := templateData{Package: pkg}
 
+	schemaNames := make(map[string]bool)
+	for _, s := range spec.Schemas {
+		schemaNames[golang.PascalCase(s.Name)] = true
+	}
+
 	for _, op := range spec.Operations {
+		base := golang.PascalCase(op.ID)
+
+		responseTypeName := base + "Response"
+		if schemaNames[responseTypeName] {
+			responseTypeName = base + "HTTPResponse"
+		}
+		requestTypeName := base + "Request"
+		if schemaNames[requestTypeName] {
+			requestTypeName = base + "HTTPRequest"
+		}
+		paramsTypeName := base + "Params"
+		if schemaNames[paramsTypeName] {
+			paramsTypeName = base + "HTTPParams"
+		}
+
 		opData := operationData{
-			ID:          op.ID,
-			Method:      string(op.Method),
-			Path:        op.Path,
-			Summary:     op.Summary,
-			Description: op.Description,
-			IsStreaming: op.Streaming != nil,
+			ID:               op.ID,
+			Method:           string(op.Method),
+			Path:             op.Path,
+			Summary:          op.Summary,
+			IsStreaming:      op.Streaming != nil,
+			ResponseTypeName: responseTypeName,
+			RequestTypeName:  requestTypeName,
+			ParamsTypeName:   paramsTypeName,
 		}
 
 		if op.Streaming != nil {
@@ -170,11 +193,6 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string)
 				rd.Type = schemaToGoType(r.Content[0].Schema)
 			}
 			opData.Responses = append(opData.Responses, rd)
-
-			// Keep SuccessResponse for backward compat
-			if strings.HasPrefix(r.StatusCode, "2") && opData.SuccessResponse == nil {
-				opData.SuccessResponse = &rd
-			}
 		}
 
 		data.Operations = append(data.Operations, opData)

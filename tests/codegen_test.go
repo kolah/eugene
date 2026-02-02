@@ -180,6 +180,18 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 			specFile:  "testdata/specs/types/anyof.yaml",
 		},
 		{
+			name:      "types_enum_schema_clash",
+			targets:   []string{"types"},
+			outputDir: "generated/types_enum_schema_clash",
+			specFile:  "testdata/specs/types/enum-schema-clash.yaml",
+		},
+		{
+			name:      "enum_operation_clash",
+			targets:   []string{"types", "client"},
+			outputDir: "generated/enum_operation_clash",
+			specFile:  "testdata/specs/types/enum-operation-clash.yaml",
+		},
+		{
 			name:      "types_formats",
 			targets:   []string{"types"},
 			outputDir: "generated/types_formats",

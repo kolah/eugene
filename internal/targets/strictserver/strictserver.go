@@ -58,8 +58,6 @@ type operationData struct {
 	Path           string
 	FramePath      string
 	Summary        string
-	Description    string
-	Tags           []string
 	PathParams     []parameterData
 	QueryParams    []parameterData
 	HeaderParams   []parameterData
@@ -90,7 +88,6 @@ type requestBodyData struct {
 
 type responseData struct {
 	StatusCode  string
-	Description string
 	Type        string
 }
 
@@ -118,8 +115,6 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 			Path:        op.Path,
 			FramePath:   t.framework.ConvertPath(op.Path),
 			Summary:     op.Summary,
-			Description: op.Description,
-			Tags:        op.Tags,
 			IsStreaming: op.Streaming != nil,
 		}
 
@@ -164,8 +159,7 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 
 		for _, r := range op.Responses {
 			rd := responseData{
-				StatusCode:  r.StatusCode,
-				Description: r.Description,
+				StatusCode: r.StatusCode,
 			}
 			if len(r.Content) > 0 {
 				rd.Type = schemaToGoType(r.Content[0].Schema, resolver, "", "")

@@ -86,8 +86,6 @@ type operationData struct {
 	Path             string
 	FramePath        string
 	Summary          string
-	Description      string
-	Tags             []string
 	Parameters       []parameterData // path params only
 	QueryParams      []parameterData // in: query params
 	QueryString      *querystringData // OpenAPI 3.2: in: querystring
@@ -110,8 +108,6 @@ type streamingData struct {
 type parameterData struct {
 	Name        string
 	GoName      string
-	In          string
-	Description string
 	Required    bool
 	Type        string
 }
@@ -142,8 +138,6 @@ type multipartFieldData struct {
 
 type responseData struct {
 	StatusCode  string
-	Description string
-	MediaType   string
 	Type        string
 }
 
@@ -162,8 +156,6 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 			Path:        op.Path,
 			FramePath:   t.framework.ConvertPath(op.Path),
 			Summary:     op.Summary,
-			Description: op.Description,
-			Tags:        op.Tags,
 			HasBody:     op.RequestBody != nil,
 			IsStreaming: op.Streaming != nil,
 		}
@@ -178,12 +170,10 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 		for _, p := range op.Parameters {
 			paramType := schemaToGoType(p.Schema, resolver, op.ID, p.Name)
 			pd := parameterData{
-				Name:        p.Name,
-				GoName:      golang.PascalCase(p.Name),
-				In:          string(p.In),
-				Description: p.Description,
-				Required:    p.Required,
-				Type:        paramType,
+				Name:     p.Name,
+				GoName:   golang.PascalCase(p.Name),
+				Required: p.Required,
+				Type:     paramType,
 			}
 
 			switch p.In {
@@ -227,11 +217,9 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 
 		for _, r := range op.Responses {
 			rd := responseData{
-				StatusCode:  r.StatusCode,
-				Description: r.Description,
+				StatusCode: r.StatusCode,
 			}
 			if len(r.Content) > 0 {
-				rd.MediaType = r.Content[0].MediaType
 				rd.Type = schemaToGoType(r.Content[0].Schema, resolver, "", "")
 			}
 			opData.Responses = append(opData.Responses, rd)
@@ -266,11 +254,9 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 				}
 				for _, r := range cbOp.Responses {
 					rd := responseData{
-						StatusCode:  r.StatusCode,
-						Description: r.Description,
+						StatusCode: r.StatusCode,
 					}
 					if len(r.Content) > 0 {
-						rd.MediaType = r.Content[0].MediaType
 						rd.Type = schemaToGoType(r.Content[0].Schema, resolver, "", "")
 					}
 					cbOpData.Responses = append(cbOpData.Responses, rd)

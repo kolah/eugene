@@ -48,19 +48,30 @@ func New(cfg *config.Config) (*Generator, error) {
 func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error) {
 	var outputs []Output
 
-	// Phase 1: Collect all enum usages
 	g.registry = golang.NewEnumRegistry()
 	g.collectEnums(spec)
 
-	// Phase 2: Resolve canonical names
-	g.registry.ResolveNames()
+	var schemaNames []string
+	for _, s := range spec.Schemas {
+		schemaNames = append(schemaNames, golang.PascalCase(s.Name))
+	}
+	g.registry.AddReservedNames(schemaNames...)
 
-	// Phase 3: Share registry with template resolver
+	var opNames []string
+	for _, op := range spec.Operations {
+		base := golang.PascalCase(op.ID)
+		opNames = append(opNames, base+"Response", base+"Request", base+"Params")
+		opNames = append(opNames, base+"MultipartRequest", base+"FormRequest", base+"QueryParams")
+		opNames = append(opNames, base+"RequestObject", base+"ResponseObject")
+		for _, r := range op.Responses {
+			opNames = append(opNames, base+r.StatusCode+"Response", base+r.StatusCode+"JSONResponse")
+		}
+	}
+	g.registry.AddReservedNames(opNames...)
+
+	g.registry.ResolveNames()
 	g.resolverState.SetRegistry(g.registry)
 
-	// Phase 4: Generate with shared registry
-
-	// Generate router.go for Echo when server or strict-server is present
 	if g.config.Go.ServerFramework == "echo" && (g.config.HasTarget("server") || g.config.HasTarget("strict-server")) {
 		content, err := g.engine.Execute("go/server/echo_router.tmpl", map[string]string{"Package": g.config.Go.Package})
 		if err != nil {
@@ -116,7 +127,6 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 		if err != nil {
 			return nil, err
 		}
-		// Generate strict types (request/response types + interface)
 		typesContent, err := target.GenerateTypes(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, g.registry)
 		if err != nil {
 			return nil, fmt.Errorf("generating strict types: %w", err)
@@ -129,7 +139,6 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 			Filename: "strict_types.eugene.go",
 			Content:  string(typesFormatted),
 		})
-		// Generate strict adapter (framework-specific handler wrapper)
 		adapterContent, err := target.GenerateAdapter(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, g.registry)
 		if err != nil {
 			return nil, fmt.Errorf("generating strict adapter: %w", err)
@@ -190,7 +199,6 @@ func (g *Generator) collectEnums(spec *model.Spec) {
 		}
 	}
 
-	// Collect from schema properties
 	for _, s := range spec.Schemas {
 		for _, prop := range s.Properties {
 			if prop.Schema != nil && len(prop.Schema.Enum) > 0 {

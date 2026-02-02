@@ -20,6 +20,7 @@ type EnumRegistry struct {
 	valueToName    map[string]string
 	nameToValues   map[string]string
 	generatedTypes map[string]ResolvedType
+	reservedNames  map[string]bool
 }
 
 // NewEnumRegistry creates a new EnumRegistry.
@@ -28,6 +29,15 @@ func NewEnumRegistry() *EnumRegistry {
 		valueToName:    make(map[string]string),
 		nameToValues:   make(map[string]string),
 		generatedTypes: make(map[string]ResolvedType),
+		reservedNames:  make(map[string]bool),
+	}
+}
+
+// AddReservedNames registers names that cannot be used for enum types
+// (e.g. top-level schema names that would cause collisions).
+func (r *EnumRegistry) AddReservedNames(names ...string) {
+	for _, n := range names {
+		r.reservedNames[n] = true
 	}
 }
 
@@ -85,9 +95,17 @@ func (r *EnumRegistry) determineName(usages []EnumUsage, valuesKey string) strin
 
 	baseName := PascalCase(bestField)
 
+	// Check for collision with reserved names (top-level schema names)
+	if r.reservedNames[baseName] {
+		candidate := baseName + "Enum"
+		if r.reservedNames[candidate] {
+			return usages[0].ParentName + baseName
+		}
+		return candidate
+	}
+
 	// Check for collision with different values
 	if existingKey, taken := r.nameToValues[baseName]; taken && existingKey != valuesKey {
-		// Add suffix from sorted values
 		suffix := valueSuffix(usages[0].Values)
 		return baseName + suffix
 	}

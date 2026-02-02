@@ -1,0 +1,38 @@
+openapi: "3.0.3"
+info:
+  title: Enum Operation Name Clash Test
+  version: "1.0.0"
+paths:
+  /applications/{id}/dev-cloud:
+    post:
+      operationId: markApplicationForDevCloud
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkApplicationForDevCloudResponse"
+components:
+  schemas:
+    MarkApplicationForDevCloudResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+    Application:
+      type: object
+      properties:
+        id:
+          type: string
+        mark_application_for_dev_cloud_response:
+          type: string
+          enum: [pending, approved, rejected]

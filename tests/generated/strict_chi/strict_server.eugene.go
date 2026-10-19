@@ -23,7 +23,10 @@ func NewStrictHandler(ssi StrictServerInterface) *StrictChiHandler {
 func (h *StrictChiHandler) ListItems(w http.ResponseWriter, r *http.Request) {
 	var request ListItemsRequestObject
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			http.Error(w, "invalid limit", http.StatusBadRequest)
+			return
+		} else {
 			request.Limit = &parsed
 		}
 	}

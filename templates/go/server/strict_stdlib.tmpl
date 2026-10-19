@@ -72,25 +72,37 @@ func (h *StrictHandler) {{ .ID }}(w http.ResponseWriter, r *http.Request) {
 	}
 {{- else if eq .Type "int" }}
 	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
 			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
 		}
 	}
 {{- else if eq .Type "int64" }}
 	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err != nil {
+			http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
 			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
 		}
 	}
 {{- else if eq .Type "bool" }}
 	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseBool(v); err == nil {
+		if parsed, err := strconv.ParseBool(v); err != nil {
+			http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
 			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
 		}
 	}
 {{- else if eq .Type "uuid.UUID" }}
 	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := uuid.Parse(v); err == nil {
+		if parsed, err := uuid.Parse(v); err != nil {
+			http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
 			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
 		}
 	}

@@ -3,6 +3,7 @@ package gen
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
@@ -74,6 +75,13 @@ func (h *StrictEchoHandler) GetItem(ctx echo.Context) error {
 	request.ID = ctx.Param("id")
 	if v := ctx.QueryParam("filter"); v != "" {
 		request.Filter = &v
+	}
+	if v := ctx.QueryParam("limit"); v != "" {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid limit")
+		} else {
+			request.Limit = &parsed
+		}
 	}
 	if v := ctx.Request().Header.Get("X-Request-ID"); v != "" {
 		request.XRequestID = &v

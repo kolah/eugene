@@ -21,6 +21,7 @@ type EchoMultipartMultipartRequest struct {
 
 type GetItemQueryParams struct {
 	Filter *string `query:"filter"`
+	Limit  *int    `query:"limit"`
 }
 
 type ServerInterface interface {

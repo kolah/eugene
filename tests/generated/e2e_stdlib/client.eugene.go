@@ -365,6 +365,9 @@ func (c *Client) GetItem(ctx context.Context, id string, params *GetItemParams) 
 		if params.Filter != nil {
 			q.Set("filter", fmt.Sprint(*params.Filter))
 		}
+		if params.Limit != nil {
+			q.Set("limit", fmt.Sprint(*params.Limit))
+		}
 		if len(q) > 0 {
 			path += "?" + q.Encode()
 		}
@@ -669,4 +672,5 @@ func (c *Client) CreateShape(ctx context.Context, body Shape) (*CreateShapeRespo
 
 type GetItemParams struct {
 	Filter *string
+	Limit  *int
 }

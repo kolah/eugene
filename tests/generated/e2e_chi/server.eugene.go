@@ -4,6 +4,7 @@ package gen
 import (
 	"mime/multipart"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -21,6 +22,7 @@ type EchoMultipartMultipartRequest struct {
 
 type GetItemQueryParams struct {
 	Filter *string
+	Limit  *int
 }
 
 type ServerInterface interface {
@@ -84,6 +86,11 @@ func (w *ServerInterfaceWrapper) GetItem(rw http.ResponseWriter, r *http.Request
 	var params GetItemQueryParams
 	if v := r.URL.Query().Get("filter"); v != "" {
 		params.Filter = &v
+	}
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil {
+			params.Limit = &parsed
+		}
 	}
 	w.Handler.GetItem(rw, r, id, params)
 }

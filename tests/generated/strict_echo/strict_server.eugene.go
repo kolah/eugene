@@ -22,7 +22,9 @@ func NewStrictHandler(ssi StrictServerInterface) *StrictEchoHandler {
 func (h *StrictEchoHandler) ListItems(ctx echo.Context) error {
 	var request ListItemsRequestObject
 	if v := ctx.QueryParam("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid limit")
+		} else {
 			request.Limit = &parsed
 		}
 	}

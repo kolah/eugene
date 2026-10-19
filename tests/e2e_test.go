@@ -614,6 +614,13 @@ func TestE2EStrictServer(t *testing.T) {
 		assert.Equal(t, "NOT_FOUND", *resp.JSON404.Code)
 		assert.Equal(t, "Item not found", *resp.JSON404.Message)
 	})
+
+	t.Run("Unparseable integer query param returns 400", func(t *testing.T) {
+		resp, err := http.Get(server.URL + "/items/strict-item-456?limit=abc")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
 }
 
 func TestE2EHeaderParams(t *testing.T) {

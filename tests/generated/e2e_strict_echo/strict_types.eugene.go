@@ -26,6 +26,7 @@ type EchoMultipartRequestObject struct {
 type GetItemRequestObject struct {
 	ID         string  // path parameter
 	Filter     *string // query parameter
+	Limit      *int    // query parameter
 	XRequestID *string // header parameter
 }
 

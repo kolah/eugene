@@ -1,0 +1,12 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories:
+      - /
+      - /tests
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        patterns:
+          - "*"

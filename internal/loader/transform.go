@@ -3,7 +3,7 @@ package loader
 import (
 	"strings"
 
-	"github.com/kolah/eugene/internal/model"
+	"github.com/kolah/eugene/v2/internal/model"
 	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"

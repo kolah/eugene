@@ -3,8 +3,8 @@ package golang
 import (
 	"testing"
 
-	"github.com/kolah/eugene/internal/config"
-	"github.com/kolah/eugene/internal/model"
+	"github.com/kolah/eugene/v2/internal/config"
+	"github.com/kolah/eugene/v2/internal/model"
 	"github.com/stretchr/testify/require"
 )
 

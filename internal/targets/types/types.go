@@ -1,10 +1,10 @@
 package types
 
 import (
-	"github.com/kolah/eugene/internal/config"
-	"github.com/kolah/eugene/internal/golang"
-	"github.com/kolah/eugene/internal/model"
-	"github.com/kolah/eugene/internal/templates"
+	"github.com/kolah/eugene/v2/internal/config"
+	"github.com/kolah/eugene/v2/internal/golang"
+	"github.com/kolah/eugene/v2/internal/model"
+	"github.com/kolah/eugene/v2/internal/templates"
 )
 
 type Target struct{}

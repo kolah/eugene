@@ -1,4 +1,4 @@
-module github.com/kolah/eugene
+module github.com/kolah/eugene/v2
 
 go 1.26.0
 

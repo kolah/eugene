@@ -3,16 +3,16 @@ package codegen
 import (
 	"fmt"
 
-	"github.com/kolah/eugene/internal/config"
-	"github.com/kolah/eugene/internal/golang"
-	"github.com/kolah/eugene/internal/model"
-	"github.com/kolah/eugene/internal/targets/client"
-	"github.com/kolah/eugene/internal/targets/server"
-	spectarget "github.com/kolah/eugene/internal/targets/spec"
-	"github.com/kolah/eugene/internal/targets/strictserver"
-	"github.com/kolah/eugene/internal/targets/types"
-	"github.com/kolah/eugene/internal/templates"
-	embeddedtmpl "github.com/kolah/eugene/templates"
+	"github.com/kolah/eugene/v2/internal/config"
+	"github.com/kolah/eugene/v2/internal/golang"
+	"github.com/kolah/eugene/v2/internal/model"
+	"github.com/kolah/eugene/v2/internal/targets/client"
+	"github.com/kolah/eugene/v2/internal/targets/server"
+	spectarget "github.com/kolah/eugene/v2/internal/targets/spec"
+	"github.com/kolah/eugene/v2/internal/targets/strictserver"
+	"github.com/kolah/eugene/v2/internal/targets/types"
+	"github.com/kolah/eugene/v2/internal/templates"
+	embeddedtmpl "github.com/kolah/eugene/v2/templates"
 )
 
 type Generator struct {

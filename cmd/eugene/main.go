@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kolah/eugene/internal/cli"
+	"github.com/kolah/eugene/v2/internal/cli"
 )
 
 func main() {

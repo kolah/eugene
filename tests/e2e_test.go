@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	basic "github.com/kolah/eugene/tests/generated/e2e_echo"
-	chiGen "github.com/kolah/eugene/tests/generated/e2e_chi"
-	stdlibGen "github.com/kolah/eugene/tests/generated/e2e_stdlib"
-	strict "github.com/kolah/eugene/tests/generated/e2e_strict_echo"
+	basic "github.com/kolah/eugene/v2/tests/generated/e2e_echo"
+	chiGen "github.com/kolah/eugene/v2/tests/generated/e2e_chi"
+	stdlibGen "github.com/kolah/eugene/v2/tests/generated/e2e_stdlib"
+	strict "github.com/kolah/eugene/v2/tests/generated/e2e_strict_echo"
 )
 
 // === Basic Server Handler ===

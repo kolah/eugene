@@ -1,11 +1,11 @@
-module github.com/kolah/eugene/tests
+module github.com/kolah/eugene/v2/tests
 
 go 1.26.0
 
 require (
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/uuid v1.6.0
-	github.com/kolah/eugene v1.0.5
+	github.com/kolah/eugene/v2 v2.0.0
 	github.com/labstack/echo/v4 v4.16.0
 	github.com/oapi-codegen/nullable v1.2.0
 	github.com/stretchr/testify v1.11.1
@@ -47,3 +47,5 @@ require (
 	golang.org/x/tools v0.51.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/kolah/eugene/v2 => ../

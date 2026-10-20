@@ -3,7 +3,7 @@ package spec
 import (
 	"encoding/base64"
 
-	"github.com/kolah/eugene/internal/templates"
+	"github.com/kolah/eugene/v2/internal/templates"
 )
 
 type Target struct{}

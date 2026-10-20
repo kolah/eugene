@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/kolah/eugene/internal/config"
+	"github.com/kolah/eugene/v2/internal/config"
 	"github.com/spf13/cobra"
 )
 

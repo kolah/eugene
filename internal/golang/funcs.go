@@ -7,8 +7,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/kolah/eugene/internal/config"
-	"github.com/kolah/eugene/internal/model"
+	"github.com/kolah/eugene/v2/internal/config"
+	"github.com/kolah/eugene/v2/internal/model"
 )
 
 // toSchemaPtr converts any schema value to a pointer.

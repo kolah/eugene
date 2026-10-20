@@ -9,13 +9,13 @@ Underneath, the tool is built upon [pb33f/libopenapi](https://github.com/pb33f/l
 ## Installation
 
 ```bash
-go install github.com/kolah/eugene/cmd/eugene@latest
+go install github.com/kolah/eugene/v2/cmd/eugene@latest
 ```
 
 or use it as a tool dependency:
 
 ```bash
-go get -tool github.com/kolah/eugene/cmd/eugene@latest
+go get -tool github.com/kolah/eugene/v2/cmd/eugene@latest
 ```
 
 ## Quick Start

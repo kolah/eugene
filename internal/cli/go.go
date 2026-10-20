@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kolah/eugene/internal/codegen"
-	"github.com/kolah/eugene/internal/config"
-	"github.com/kolah/eugene/internal/loader"
+	"github.com/kolah/eugene/v2/internal/codegen"
+	"github.com/kolah/eugene/v2/internal/config"
+	"github.com/kolah/eugene/v2/internal/loader"
 	"github.com/spf13/cobra"
 )
 

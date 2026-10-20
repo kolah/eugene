@@ -12,9 +12,13 @@ type GetItemQueryParams struct {
 	Limit  *int    `query:"limit"`
 }
 
+type GetItemHeaderParams struct {
+	XRequestID *string `header:"X-Request-ID"`
+}
+
 type ServerInterface interface {
 	// GetItem
-	GetItem(ctx echo.Context, id string, params GetItemQueryParams) error
+	GetItem(ctx echo.Context, id string, params GetItemQueryParams, headers GetItemHeaderParams) error
 }
 
 type ServerInterfaceWrapper struct {
@@ -27,7 +31,11 @@ func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
 	}
-	return w.Handler.GetItem(ctx, id, params)
+	var headers GetItemHeaderParams
+	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	}
+	return w.Handler.GetItem(ctx, id, params, headers)
 }
 
 func RegisterHandlers(router Router, si ServerInterface) {

@@ -56,8 +56,13 @@ func (h *BasicEchoHandler) EchoMultipart(ctx echo.Context, req basic.EchoMultipa
 	})
 }
 
-func (h *BasicEchoHandler) GetItem(ctx echo.Context, id string, params basic.GetItemQueryParams) error {
-	requestID := ctx.Request().Header.Get("X-Request-ID")
+func (h *BasicEchoHandler) GetItem(
+	ctx echo.Context,
+	id string,
+	params basic.GetItemQueryParams,
+	headers basic.GetItemHeaderParams,
+) error {
+	requestID := headers.XRequestID
 
 	if id == "not-found" {
 		code := "NOT_FOUND"
@@ -71,7 +76,7 @@ func (h *BasicEchoHandler) GetItem(ctx echo.Context, id string, params basic.Get
 	return ctx.JSON(http.StatusOK, basic.ItemWithParams{
 		ID:        &id,
 		Filter:    params.Filter,
-		RequestID: &requestID,
+		RequestID: requestID,
 	})
 }
 
@@ -249,8 +254,14 @@ func (h *ChiHandler) EchoMultipart(w http.ResponseWriter, r *http.Request, req c
 	})
 }
 
-func (h *ChiHandler) GetItem(w http.ResponseWriter, r *http.Request, id string, params chiGen.GetItemQueryParams) {
-	requestID := r.Header.Get("X-Request-ID")
+func (h *ChiHandler) GetItem(
+	w http.ResponseWriter,
+	r *http.Request,
+	id string,
+	params chiGen.GetItemQueryParams,
+	headers chiGen.GetItemHeaderParams,
+) {
+	requestID := headers.XRequestID
 
 	if id == "not-found" {
 		code := "NOT_FOUND"
@@ -268,7 +279,7 @@ func (h *ChiHandler) GetItem(w http.ResponseWriter, r *http.Request, id string, 
 	json.NewEncoder(w).Encode(chiGen.ItemWithParams{
 		ID:        &id,
 		Filter:    params.Filter,
-		RequestID: &requestID,
+		RequestID: requestID,
 	})
 }
 
@@ -388,8 +399,14 @@ func (h *StdlibHandler) EchoMultipart(w http.ResponseWriter, r *http.Request, re
 	})
 }
 
-func (h *StdlibHandler) GetItem(w http.ResponseWriter, r *http.Request, id string, params stdlibGen.GetItemQueryParams) {
-	requestID := r.Header.Get("X-Request-ID")
+func (h *StdlibHandler) GetItem(
+	w http.ResponseWriter,
+	r *http.Request,
+	id string,
+	params stdlibGen.GetItemQueryParams,
+	headers stdlibGen.GetItemHeaderParams,
+) {
+	requestID := headers.XRequestID
 
 	if id == "not-found" {
 		code := "NOT_FOUND"
@@ -407,7 +424,7 @@ func (h *StdlibHandler) GetItem(w http.ResponseWriter, r *http.Request, id strin
 	json.NewEncoder(w).Encode(stdlibGen.ItemWithParams{
 		ID:        &id,
 		Filter:    params.Filter,
-		RequestID: &requestID,
+		RequestID: requestID,
 	})
 }
 
@@ -549,13 +566,33 @@ func TestE2EBasicServer(t *testing.T) {
 
 	t.Run("Path and query params", func(t *testing.T) {
 		filter := "active"
+		requestID := "req-item-123"
 		resp, err := client.GetItem(ctx, "item-123", &basic.GetItemParams{
-			Filter: &filter,
+			Filter:     &filter,
+			XRequestID: &requestID,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp.JSON200)
 		assert.Equal(t, "item-123", *resp.JSON200.ID)
 		assert.Equal(t, "active", *resp.JSON200.Filter)
+		assert.Equal(t, requestID, *resp.JSON200.RequestID)
+	})
+
+	t.Run("Unparseable integer query param returns 400", func(t *testing.T) {
+		resp, err := http.Get(server.URL + "/items/item-123?limit=abc")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("Unparseable integer header param returns 400", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/items/item-123", nil)
+		require.NoError(t, err)
+		req.Header.Set("X-Retry-Count", "abc")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	})
 
 	t.Run("404 error response", func(t *testing.T) {
@@ -598,13 +635,33 @@ func TestE2EStrictServer(t *testing.T) {
 
 	t.Run("Path and query params", func(t *testing.T) {
 		filter := "pending"
+		requestID := "req-strict-item-456"
 		resp, err := client.GetItem(ctx, "strict-item-456", &strict.GetItemParams{
-			Filter: &filter,
+			Filter:     &filter,
+			XRequestID: &requestID,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp.JSON200)
 		assert.Equal(t, "strict-item-456", *resp.JSON200.ID)
 		assert.Equal(t, "pending", *resp.JSON200.Filter)
+		assert.Equal(t, requestID, *resp.JSON200.RequestID)
+	})
+
+	t.Run("Unparseable integer query param returns 400", func(t *testing.T) {
+		resp, err := http.Get(server.URL + "/items/strict-item-456?limit=abc")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("Unparseable integer header param returns 400", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/items/strict-item-456", nil)
+		require.NoError(t, err)
+		req.Header.Set("X-Retry-Count", "abc")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	})
 
 	t.Run("404 error response", func(t *testing.T) {
@@ -613,13 +670,6 @@ func TestE2EStrictServer(t *testing.T) {
 		require.NotNil(t, resp.JSON404)
 		assert.Equal(t, "NOT_FOUND", *resp.JSON404.Code)
 		assert.Equal(t, "Item not found", *resp.JSON404.Message)
-	})
-
-	t.Run("Unparseable integer query param returns 400", func(t *testing.T) {
-		resp, err := http.Get(server.URL + "/items/strict-item-456?limit=abc")
-		require.NoError(t, err)
-		defer resp.Body.Close()
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	})
 }
 
@@ -713,13 +763,33 @@ func TestE2EChiServer(t *testing.T) {
 
 	t.Run("Path and query params", func(t *testing.T) {
 		filter := "chi-filter"
+		requestID := "req-chi-item-789"
 		resp, err := client.GetItem(ctx, "chi-item-789", &chiGen.GetItemParams{
-			Filter: &filter,
+			Filter:     &filter,
+			XRequestID: &requestID,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp.JSON200)
 		assert.Equal(t, "chi-item-789", *resp.JSON200.ID)
 		assert.Equal(t, "chi-filter", *resp.JSON200.Filter)
+		assert.Equal(t, requestID, *resp.JSON200.RequestID)
+	})
+
+	t.Run("Unparseable integer query param returns 400", func(t *testing.T) {
+		resp, err := http.Get(server.URL + "/items/chi-item-789?limit=abc")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("Unparseable integer header param returns 400", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/items/chi-item-789", nil)
+		require.NoError(t, err)
+		req.Header.Set("X-Retry-Count", "abc")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	})
 
 	t.Run("404 error response", func(t *testing.T) {
@@ -804,13 +874,33 @@ func TestE2EStdlibServer(t *testing.T) {
 
 	t.Run("Path and query params", func(t *testing.T) {
 		filter := "stdlib-filter"
+		requestID := "req-stdlib-item-101"
 		resp, err := client.GetItem(ctx, "stdlib-item-101", &stdlibGen.GetItemParams{
-			Filter: &filter,
+			Filter:     &filter,
+			XRequestID: &requestID,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, resp.JSON200)
 		assert.Equal(t, "stdlib-item-101", *resp.JSON200.ID)
 		assert.Equal(t, "stdlib-filter", *resp.JSON200.Filter)
+		assert.Equal(t, requestID, *resp.JSON200.RequestID)
+	})
+
+	t.Run("Unparseable integer query param returns 400", func(t *testing.T) {
+		resp, err := http.Get(server.URL + "/items/stdlib-item-101?limit=abc")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("Unparseable integer header param returns 400", func(t *testing.T) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/items/stdlib-item-101", nil)
+		require.NoError(t, err)
+		req.Header.Set("X-Retry-Count", "abc")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	})
 
 	t.Run("404 error response", func(t *testing.T) {

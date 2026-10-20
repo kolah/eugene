@@ -86,6 +86,13 @@ func (h *StrictEchoHandler) GetItem(ctx echo.Context) error {
 	if v := ctx.Request().Header.Get("X-Request-ID"); v != "" {
 		request.XRequestID = &v
 	}
+	if v := ctx.Request().Header.Get("X-Retry-Count"); v != "" {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Retry-Count")
+		} else {
+			request.XRetryCount = &parsed
+		}
+	}
 
 	response, err := h.ssi.GetItem(ctx.Request().Context(), request)
 	if err != nil {

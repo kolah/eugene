@@ -3,7 +3,7 @@ package {{ .Package }}
 
 import (
 	"net/http"
-{{- if .HasQueryParams }}
+{{- if or .HasQueryParams .HasHeaderParams }}
 	"strconv"
 {{- end }}
 {{- if .TimeImport }}
@@ -92,9 +92,53 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 {{- end }}
 {{- end }}
 {{- range .HeaderParams }}
+{{- if hasPrefix .Type "[]" }}
+	if values := ctx.Request().Header.Values("{{ .Name }}"); len(values) > 0 {
+		{{ if .Required }}request.{{ .GoName }} = values{{ else }}request.{{ .GoName }} = &values{{ end }}
+	}
+{{- else if eq .Type "string" }}
 	if v := ctx.Request().Header.Get("{{ .Name }}"); v != "" {
 		request.{{ .GoName }} = {{ if not .Required }}&{{ end }}v
 	}
+{{- else if eq .Type "int" }}
+	if v := ctx.Request().Header.Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+		} else {
+			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else if eq .Type "int64" }}
+	if v := ctx.Request().Header.Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+		} else {
+			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else if eq .Type "bool" }}
+	if v := ctx.Request().Header.Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.ParseBool(v); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+		} else {
+			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else if eq .Type "uuid.UUID" }}
+	if v := ctx.Request().Header.Get("{{ .Name }}"); v != "" {
+		if parsed, err := uuid.Parse(v); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+		} else {
+			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else }}
+	if v := ctx.Request().Header.Get("{{ .Name }}"); v != "" {
+		{{ if .Required }}typed := {{ .Type }}(v)
+		request.{{ .GoName }} = typed{{ else }}typed := {{ .Type }}(v)
+		request.{{ .GoName }} = &typed{{ end }}
+	}
+{{- end }}
 {{- end }}
 {{- if .QueryString }}
 	if err := ctx.Bind(&request.{{ .QueryString.GoName }}); err != nil {

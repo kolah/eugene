@@ -90,6 +90,10 @@ paths:
           in: header
           schema:
             type: string
+        - name: X-Retry-Count
+          in: header
+          schema:
+            type: integer
       responses:
         "200":
           description: Item with params

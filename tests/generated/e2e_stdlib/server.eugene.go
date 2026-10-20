@@ -23,6 +23,11 @@ type GetItemQueryParams struct {
 	Limit  *int
 }
 
+type GetItemHeaderParams struct {
+	XRequestID  *string
+	XRetryCount *int
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(w http.ResponseWriter, r *http.Request)
@@ -31,7 +36,7 @@ type ServerInterface interface {
 	// EchoMultipart
 	EchoMultipart(w http.ResponseWriter, r *http.Request, req EchoMultipartMultipartRequest)
 	// GetItem
-	GetItem(w http.ResponseWriter, r *http.Request, id string, params GetItemQueryParams)
+	GetItem(w http.ResponseWriter, r *http.Request, id string, params GetItemQueryParams, headers GetItemHeaderParams)
 	// CreateResource
 	CreateResource(w http.ResponseWriter, r *http.Request)
 	// DeleteResource
@@ -86,11 +91,26 @@ func (w *ServerInterfaceWrapper) GetItem(rw http.ResponseWriter, r *http.Request
 		params.Filter = &v
 	}
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			http.Error(rw, "invalid limit", http.StatusBadRequest)
+			return
+		} else {
 			params.Limit = &parsed
 		}
 	}
-	w.Handler.GetItem(rw, r, id, params)
+	var headers GetItemHeaderParams
+	if v := r.Header.Get("X-Request-ID"); v != "" {
+		headers.XRequestID = &v
+	}
+	if v := r.Header.Get("X-Retry-Count"); v != "" {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			http.Error(rw, "invalid X-Retry-Count", http.StatusBadRequest)
+			return
+		} else {
+			headers.XRetryCount = &parsed
+		}
+	}
+	w.Handler.GetItem(rw, r, id, params, headers)
 }
 
 func (w *ServerInterfaceWrapper) CreateResource(rw http.ResponseWriter, r *http.Request) {

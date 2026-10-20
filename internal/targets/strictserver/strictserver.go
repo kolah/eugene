@@ -41,6 +41,7 @@ type templateData struct {
 	Operations     []operationData
 	Framework      string
 	HasQueryParams bool
+	HasHeaderParams bool
 	HasQueryString bool // OpenAPI 3.2: any operation uses in: querystring
 	UUIDImport     string
 	TimeImport     bool
@@ -105,6 +106,7 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 	resolver := golang.NewTypeResolverWithRegistry(cfg, nil, registry)
 	var ops []operationData
 	hasQueryParams := false
+	hasHeaderParams := false
 	hasQueryString := false
 	timeImport := false
 
@@ -138,6 +140,7 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 				hasQueryParams = true
 			case model.LocationHeader:
 				opData.HeaderParams = append(opData.HeaderParams, pd)
+				hasHeaderParams = true
 			case model.LocationQueryString:
 				opData.QueryString = &querystringData{
 					Name:   p.Name,
@@ -192,6 +195,7 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 		Operations:     ops,
 		Framework:      t.framework.Name(),
 		HasQueryParams: hasQueryParams,
+		HasHeaderParams: hasHeaderParams,
 		HasQueryString: hasQueryString,
 		UUIDImport:     resolver.UUIDImport(),
 		TimeImport:     timeImport,

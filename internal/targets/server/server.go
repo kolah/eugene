@@ -38,6 +38,7 @@ type serverFeatures struct {
 	HasStreaming      bool // any operation uses SSE
 	HasQueryString    bool // any operation uses querystring param (OpenAPI 3.2)
 	HasQueryParams    bool // any operation uses in: query params
+	HasHeaderParams   bool // any operation uses in: header params
 	HasCallbacks      bool // any operation defines callbacks
 	HasMultipart      bool // any operation uses multipart/form-data
 	HasFormUrlEncoded bool // any operation uses application/x-www-form-urlencoded
@@ -88,12 +89,14 @@ type operationData struct {
 	Summary          string
 	Parameters       []parameterData // path params only
 	QueryParams      []parameterData // in: query params
+	HeaderParams     []parameterData // in: header params
 	QueryString      *querystringData // OpenAPI 3.2: in: querystring
 	RequestBody      *requestBodyData
 	Responses        []responseData
 	Streaming        *streamingData // SSE/streaming
 	HasBody          bool
 	HasQueryParams   bool
+	HasHeaderParams  bool
 	HasQueryString   bool
 	IsStreaming      bool
 	IsMultipart      bool
@@ -188,6 +191,10 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 				opData.QueryParams = append(opData.QueryParams, pd)
 				opData.HasQueryParams = true
 				data.Features.HasQueryParams = true
+			case model.LocationHeader:
+				opData.HeaderParams = append(opData.HeaderParams, pd)
+				opData.HasHeaderParams = true
+				data.Features.HasHeaderParams = true
 			case model.LocationPath:
 				opData.Parameters = append(opData.Parameters, pd)
 			}

@@ -380,6 +380,12 @@ func (c *Client) GetItem(ctx context.Context, id string, params *GetItemParams) 
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 	httpReq.Header.Set("Accept", "application/json")
+	if params != nil && params.XRequestID != nil {
+		httpReq.Header.Set("X-Request-ID", fmt.Sprint(*params.XRequestID))
+	}
+	if params != nil && params.XRetryCount != nil {
+		httpReq.Header.Set("X-Retry-Count", fmt.Sprint(*params.XRetryCount))
+	}
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -671,6 +677,8 @@ func (c *Client) CreateShape(ctx context.Context, body Shape) (*CreateShapeRespo
 }
 
 type GetItemParams struct {
-	Filter *string
-	Limit  *int
+	Filter      *string
+	Limit       *int
+	XRequestID  *string
+	XRetryCount *int
 }

@@ -24,6 +24,11 @@ type GetItemQueryParams struct {
 	Limit  *int    `query:"limit"`
 }
 
+type GetItemHeaderParams struct {
+	XRequestID  *string `header:"X-Request-ID"`
+	XRetryCount *int    `header:"X-Retry-Count"`
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(ctx echo.Context) error
@@ -32,7 +37,7 @@ type ServerInterface interface {
 	// EchoMultipart
 	EchoMultipart(ctx echo.Context, req EchoMultipartMultipartRequest) error
 	// GetItem
-	GetItem(ctx echo.Context, id string, params GetItemQueryParams) error
+	GetItem(ctx echo.Context, id string, params GetItemQueryParams, headers GetItemHeaderParams) error
 	// CreateResource
 	CreateResource(ctx echo.Context) error
 	// DeleteResource
@@ -82,7 +87,11 @@ func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
 	}
-	return w.Handler.GetItem(ctx, id, params)
+	var headers GetItemHeaderParams
+	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	}
+	return w.Handler.GetItem(ctx, id, params, headers)
 }
 
 func (w *ServerInterfaceWrapper) CreateResource(ctx echo.Context) error {

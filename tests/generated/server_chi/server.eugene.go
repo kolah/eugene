@@ -32,7 +32,10 @@ type ServerInterfaceWrapper struct {
 func (w *ServerInterfaceWrapper) ListItems(rw http.ResponseWriter, r *http.Request) {
 	var params ListItemsQueryParams
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			http.Error(rw, "invalid limit", http.StatusBadRequest)
+			return
+		} else {
 			params.Limit = &parsed
 		}
 	}

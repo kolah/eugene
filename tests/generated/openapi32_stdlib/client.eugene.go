@@ -166,7 +166,7 @@ func (s *EventStream) Close() error {
 	return s.resp.Body.Close()
 }
 
-func doStreamRequest(ctx context.Context, c *Client, method, path string, body any) (*EventStream, error) {
+func doStreamRequest(ctx context.Context, c *Client, method, path string, body any, header http.Header) (*EventStream, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -185,6 +185,9 @@ func doStreamRequest(ctx context.Context, c *Client, method, path string, body a
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Accept", "text/event-stream")
+	for name, values := range header {
+		req.Header[name] = values
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -332,7 +335,7 @@ func (c *Client) SearchItems(ctx context.Context, body SearchQuery) (*SearchItem
 // StreamEvents - Stream events via SSE (streaming)
 func (c *Client) StreamEvents(ctx context.Context) (*EventStream, error) {
 	path := "/events"
-	return doStreamRequest(ctx, c, "GET", path, nil)
+	return doStreamRequest(ctx, c, "GET", path, nil, nil)
 }
 
 // ListItems - List items with query parameter
@@ -393,7 +396,7 @@ func (c *Client) ListItems(ctx context.Context, params *ListItemsParams) (*ListI
 // StreamSse - Stream data via SSE with itemSchema (streaming)
 func (c *Client) StreamSse(ctx context.Context) (*EventStream, error) {
 	path := "/stream/sse"
-	return doStreamRequest(ctx, c, "GET", path, nil)
+	return doStreamRequest(ctx, c, "GET", path, nil, nil)
 }
 
 // StreamJsonl - Stream data via JSON Lines

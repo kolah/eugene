@@ -183,7 +183,7 @@ func (s *EventStream) Close() error {
 	return s.resp.Body.Close()
 }
 
-func doStreamRequest(ctx context.Context, c *Client, method, path string, body any) (*EventStream, error) {
+func doStreamRequest(ctx context.Context, c *Client, method, path string, body any, header http.Header) (*EventStream, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -202,6 +202,9 @@ func doStreamRequest(ctx context.Context, c *Client, method, path string, body a
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Accept", "text/event-stream")
+	for name, values := range header {
+		req.Header[name] = values
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -300,7 +303,7 @@ type {{ .RequestTypeName }} struct {
 {{ range .Operations }}
 {{- if .IsStreaming }}
 {{ if .Summary }}// {{ .ID | pascalCase }} - {{ .Summary }} (streaming){{ end }}
-func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ if .HasBody }}, body {{ .RequestBody.Type }}{{ end }}{{ if .HasQueryParams }}, params *{{ .ParamsTypeName }}{{ end }}{{ if .HasQueryString }}, query *{{ .QueryStringParam.Type }}{{ end }}) (*EventStream, error) {
+func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ if .HasBody }}, body {{ .RequestBody.Type }}{{ end }}{{ if or .HasQueryParams .HasHeaderParams }}, params *{{ .ParamsTypeName }}{{ end }}{{ if .HasQueryString }}, query *{{ .QueryStringParam.Type }}{{ end }}) (*EventStream, error) {
 	path := "{{ .Path }}"
 {{- range .PathParams }}
 	path = strings.Replace(path, "{{"{"}}{{ .Name }}{{"}"}}", fmt.Sprint({{ .GoName | lower }}), 1)
@@ -327,11 +330,25 @@ func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams 
 		path += "?" + encodeQueryString(query)
 	}
 {{- end }}
-	return doStreamRequest(ctx, c, "{{ .Method }}", path{{ if .HasBody }}, body{{ else }}, nil{{ end }})
+{{- if .HasHeaderParams }}
+	header := http.Header{}
+{{- range .HeaderParams }}
+{{- if .Required }}
+	if params != nil {
+		header.Set("{{ .Name }}", fmt.Sprint(params.{{ .GoName }}))
+	}
+{{- else }}
+	if params != nil && params.{{ .GoName }} != nil {
+		header.Set("{{ .Name }}", fmt.Sprint(*params.{{ .GoName }}))
+	}
+{{- end }}
+{{- end }}
+{{- end }}
+	return doStreamRequest(ctx, c, "{{ .Method }}", path{{ if .HasBody }}, body{{ else }}, nil{{ end }}{{ if .HasHeaderParams }}, header{{ else }}, nil{{ end }})
 }
 {{- else }}
 {{ if .Summary }}// {{ .ID | pascalCase }} - {{ .Summary }}{{ end }}
-func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ if and .HasBody (not .IsMultipart) (not .IsFormUrlEncoded) }}, body {{ .RequestBody.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .RequestTypeName }}{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .RequestTypeName }}{{ end }}{{ if .HasQueryParams }}, params *{{ .ParamsTypeName }}{{ end }}{{ if .HasQueryString }}, query *{{ .QueryStringParam.Type }}{{ end }}) (*{{ .ResponseTypeName }}, error) {
+func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ if and .HasBody (not .IsMultipart) (not .IsFormUrlEncoded) }}, body {{ .RequestBody.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .RequestTypeName }}{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .RequestTypeName }}{{ end }}{{ if or .HasQueryParams .HasHeaderParams }}, params *{{ .ParamsTypeName }}{{ end }}{{ if .HasQueryString }}, query *{{ .QueryStringParam.Type }}{{ end }}) (*{{ .ResponseTypeName }}, error) {
 	path := "{{ .Path }}"
 {{- range .PathParams }}
 	path = strings.Replace(path, "{{"{"}}{{ .Name }}{{"}"}}", fmt.Sprint({{ .GoName | lower }}), 1)
@@ -444,6 +461,17 @@ func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams 
 	}
 {{- end }}
 	httpReq.Header.Set("Accept", "application/json")
+{{- range .HeaderParams }}
+{{- if .Required }}
+	if params != nil {
+		httpReq.Header.Set("{{ .Name }}", fmt.Sprint(params.{{ .GoName }}))
+	}
+{{- else }}
+	if params != nil && params.{{ .GoName }} != nil {
+		httpReq.Header.Set("{{ .Name }}", fmt.Sprint(*params.{{ .GoName }}))
+	}
+{{- end }}
+{{- end }}
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -498,10 +526,17 @@ func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams 
 {{- end }}
 {{ end }}
 {{- range .Operations }}
-{{- if .HasQueryParams }}
+{{- if or .HasQueryParams .HasHeaderParams }}
 
 type {{ .ParamsTypeName }} struct {
 {{- range .QueryParams }}
+{{- if .Required }}
+	{{ .GoName }} {{ .Type }}
+{{- else }}
+	{{ .GoName }} *{{ .Type }}
+{{- end }}
+{{- end }}
+{{- range .HeaderParams }}
 {{- if .Required }}
 	{{ .GoName }} {{ .Type }}
 {{- else }}

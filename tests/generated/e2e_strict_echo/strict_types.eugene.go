@@ -24,10 +24,11 @@ type EchoMultipartRequestObject struct {
 
 // GetItemRequestObject represents the request for GetItem.
 type GetItemRequestObject struct {
-	ID         string  // path parameter
-	Filter     *string // query parameter
-	Limit      *int    // query parameter
-	XRequestID *string // header parameter
+	ID          string  // path parameter
+	Filter      *string // query parameter
+	Limit       *int    // query parameter
+	XRequestID  *string // header parameter
+	XRetryCount *int    // header parameter
 }
 
 // CreateResourceRequestObject represents the request for CreateResource.

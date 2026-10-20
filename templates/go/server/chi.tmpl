@@ -16,7 +16,7 @@ import (
 	"mime/multipart"
 {{- end }}
 	"net/http"
-{{- if .Features.HasQueryParams }}
+{{- if or .Features.HasQueryParams .Features.HasHeaderParams }}
 	"strconv"
 {{- end }}
 {{- if .TimeImport }}
@@ -108,12 +108,20 @@ type {{ .ID | pascalCase }}QueryParams struct {
 {{- end }}
 }
 {{- end }}
+{{- if .HasHeaderParams }}
+
+type {{ .ID | pascalCase }}HeaderParams struct {
+{{- range .HeaderParams }}
+	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }}
+{{- end }}
+}
+{{- end }}
 {{- end }}
 
 type ServerInterface interface {
 {{- range .Operations }}
 	// {{ .ID | pascalCase }}{{ if .Summary }} - {{ .Summary }}{{ end }}{{ if .IsStreaming }} (streaming){{ end }}
-	{{ .ID | pascalCase }}(w http.ResponseWriter, r *http.Request{{ range .Parameters }}, {{ .GoName | camelCase }} {{ .Type }}{{ end }}{{ if .HasQueryParams }}, params {{ .ID | pascalCase }}QueryParams{{ end }}{{ if .HasQueryString }}, {{ .QueryString.GoName | camelCase }} *{{ .QueryString.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .ID | pascalCase }}MultipartRequest{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .ID | pascalCase }}FormRequest{{ end }})
+	{{ .ID | pascalCase }}(w http.ResponseWriter, r *http.Request{{ range .Parameters }}, {{ .GoName | camelCase }} {{ .Type }}{{ end }}{{ if .HasQueryParams }}, params {{ .ID | pascalCase }}QueryParams{{ end }}{{ if .HasHeaderParams }}, headers {{ .ID | pascalCase }}HeaderParams{{ end }}{{ if .HasQueryString }}, {{ .QueryString.GoName | camelCase }} *{{ .QueryString.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .ID | pascalCase }}MultipartRequest{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .ID | pascalCase }}FormRequest{{ end }})
 {{- end }}
 }
 
@@ -146,32 +154,47 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 	}
 {{- else if eq .Type "int" }}
 	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.Atoi(v); err == nil {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
 			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
 		}
 	}
 {{- else if eq .Type "int64" }}
 	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
 			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
 		}
 	}
 {{- else if eq .Type "int32" }}
 	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseInt(v, 10, 32); err == nil {
+		if parsed, err := strconv.ParseInt(v, 10, 32); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
 			val := int32(parsed)
 			{{ if .Required }}params.{{ .GoName }} = val{{ else }}params.{{ .GoName }} = &val{{ end }}
 		}
 	}
 {{- else if eq .Type "bool" }}
 	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseBool(v); err == nil {
+		if parsed, err := strconv.ParseBool(v); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
 			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
 		}
 	}
 {{- else if eq .Type "uuid.UUID" }}
 	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := uuid.Parse(v); err == nil {
+		if parsed, err := uuid.Parse(v); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
 			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
 		}
 	}
@@ -180,6 +203,72 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 		{{ if .Required }}typed := {{ .Type }}(v)
 		params.{{ .GoName }} = typed{{ else }}typed := {{ .Type }}(v)
 		params.{{ .GoName }} = &typed{{ end }}
+	}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if .HasHeaderParams }}
+	var headers {{ .ID | pascalCase }}HeaderParams
+{{- range .HeaderParams }}
+{{- if hasPrefix .Type "[]" }}
+	if values := r.Header.Values("{{ .Name }}"); len(values) > 0 {
+		{{ if .Required }}headers.{{ .GoName }} = values{{ else }}headers.{{ .GoName }} = &values{{ end }}
+	}
+{{- else if eq .Type "string" }}
+	if v := r.Header.Get("{{ .Name }}"); v != "" {
+		{{ if .Required }}headers.{{ .GoName }} = v{{ else }}headers.{{ .GoName }} = &v{{ end }}
+	}
+{{- else if eq .Type "int" }}
+	if v := r.Header.Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
+			{{ if .Required }}headers.{{ .GoName }} = parsed{{ else }}headers.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else if eq .Type "int64" }}
+	if v := r.Header.Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 64); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
+			{{ if .Required }}headers.{{ .GoName }} = parsed{{ else }}headers.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else if eq .Type "int32" }}
+	if v := r.Header.Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.ParseInt(v, 10, 32); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
+			val := int32(parsed)
+			{{ if .Required }}headers.{{ .GoName }} = val{{ else }}headers.{{ .GoName }} = &val{{ end }}
+		}
+	}
+{{- else if eq .Type "bool" }}
+	if v := r.Header.Get("{{ .Name }}"); v != "" {
+		if parsed, err := strconv.ParseBool(v); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
+			{{ if .Required }}headers.{{ .GoName }} = parsed{{ else }}headers.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else if eq .Type "uuid.UUID" }}
+	if v := r.Header.Get("{{ .Name }}"); v != "" {
+		if parsed, err := uuid.Parse(v); err != nil {
+			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+			return
+		} else {
+			{{ if .Required }}headers.{{ .GoName }} = parsed{{ else }}headers.{{ .GoName }} = &parsed{{ end }}
+		}
+	}
+{{- else }}
+	if v := r.Header.Get("{{ .Name }}"); v != "" {
+		{{ if .Required }}typed := {{ .Type }}(v)
+		headers.{{ .GoName }} = typed{{ else }}typed := {{ .Type }}(v)
+		headers.{{ .GoName }} = &typed{{ end }}
 	}
 {{- end }}
 {{- end }}
@@ -233,7 +322,7 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 {{- end }}
 {{- end }}
 {{- end }}
-	w.Handler.{{ .ID | pascalCase }}(rw, r{{ range .Parameters }}, {{ .GoName | camelCase }}{{ end }}{{ if .HasQueryParams }}, params{{ end }}{{ if .HasQueryString }}, &{{ .QueryString.GoName | camelCase }}{{ end }}{{ if .IsMultipart }}, req{{ end }}{{ if .IsFormUrlEncoded }}, req{{ end }})
+	w.Handler.{{ .ID | pascalCase }}(rw, r{{ range .Parameters }}, {{ .GoName | camelCase }}{{ end }}{{ if .HasQueryParams }}, params{{ end }}{{ if .HasHeaderParams }}, headers{{ end }}{{ if .HasQueryString }}, &{{ .QueryString.GoName | camelCase }}{{ end }}{{ if .IsMultipart }}, req{{ end }}{{ if .IsFormUrlEncoded }}, req{{ end }})
 }
 {{ end }}
 {{- if .Features.HasQueryString }}

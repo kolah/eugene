@@ -104,12 +104,20 @@ type {{ .ID | pascalCase }}QueryParams struct {
 {{- end }}
 }
 {{- end }}
+{{- if .HasHeaderParams }}
+
+type {{ .ID | pascalCase }}HeaderParams struct {
+{{- range .HeaderParams }}
+	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }} `header:"{{ .Name }}"`
+{{- end }}
+}
+{{- end }}
 {{- end }}
 
 type ServerInterface interface {
 {{- range .Operations }}
 	// {{ .ID | pascalCase }}{{ if .Summary }} - {{ .Summary }}{{ end }}{{ if .IsStreaming }} (streaming){{ end }}
-	{{ .ID | pascalCase }}(ctx echo.Context{{ range .Parameters }}, {{ .GoName | camelCase }} {{ .Type }}{{ end }}{{ if .HasQueryParams }}, params {{ .ID | pascalCase }}QueryParams{{ end }}{{ if .HasQueryString }}, {{ .QueryString.GoName | camelCase }} *{{ .QueryString.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .ID | pascalCase }}MultipartRequest{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .ID | pascalCase }}FormRequest{{ end }}) error
+	{{ .ID | pascalCase }}(ctx echo.Context{{ range .Parameters }}, {{ .GoName | camelCase }} {{ .Type }}{{ end }}{{ if .HasQueryParams }}, params {{ .ID | pascalCase }}QueryParams{{ end }}{{ if .HasHeaderParams }}, headers {{ .ID | pascalCase }}HeaderParams{{ end }}{{ if .HasQueryString }}, {{ .QueryString.GoName | camelCase }} *{{ .QueryString.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .ID | pascalCase }}MultipartRequest{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .ID | pascalCase }}FormRequest{{ end }}) error
 {{- end }}
 }
 
@@ -132,6 +140,12 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 	var params {{ .ID | pascalCase }}QueryParams
 	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	}
+{{- end }}
+{{- if .HasHeaderParams }}
+	var headers {{ .ID | pascalCase }}HeaderParams
+	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
 	}
 {{- end }}
 {{- if .HasQueryString }}
@@ -178,7 +192,7 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 {{- end }}
 {{- end }}
 {{- end }}
-	return w.Handler.{{ .ID | pascalCase }}(ctx{{ range .Parameters }}, {{ .GoName | camelCase }}{{ end }}{{ if .HasQueryParams }}, params{{ end }}{{ if .HasQueryString }}, &{{ .QueryString.GoName | camelCase }}{{ end }}{{ if .IsMultipart }}, req{{ end }}{{ if .IsFormUrlEncoded }}, req{{ end }})
+	return w.Handler.{{ .ID | pascalCase }}(ctx{{ range .Parameters }}, {{ .GoName | camelCase }}{{ end }}{{ if .HasQueryParams }}, params{{ end }}{{ if .HasHeaderParams }}, headers{{ end }}{{ if .HasQueryString }}, &{{ .QueryString.GoName | camelCase }}{{ end }}{{ if .IsMultipart }}, req{{ end }}{{ if .IsFormUrlEncoded }}, req{{ end }})
 }
 {{ end }}
 func RegisterHandlers(router Router, si ServerInterface) {

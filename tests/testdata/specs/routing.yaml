@@ -67,8 +67,29 @@ paths:
       responses:
         "204":
           description: Deleted
+  /legacy-links/{kind}/{scope}:
+    get:
+      operationId: getLegacyLink
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [post, folder, category]
+        - name: scope
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/LinkScope"
+      responses:
+        "204":
+          description: Found
 components:
   schemas:
+    LinkScope:
+      type: string
+      enum: [public, private]
     Item:
       type: object
       properties:

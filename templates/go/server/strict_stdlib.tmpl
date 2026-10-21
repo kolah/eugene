@@ -57,6 +57,12 @@ func (h *StrictHandler) {{ .ID }}(w http.ResponseWriter, r *http.Request) {
 	} else {
 		request.{{ .GoName }} = parsed
 	}
+{{- else if .IsEnum }}
+	request.{{ .GoName }} = {{ .Type }}(r.PathValue("{{ .Name }}"))
+	if !request.{{ .GoName }}.IsValid() {
+		http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
+		return
+	}
 {{- else }}
 	request.{{ .GoName }} = r.PathValue("{{ .Name }}")
 {{- end }}

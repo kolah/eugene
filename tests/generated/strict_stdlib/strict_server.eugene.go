@@ -110,6 +110,31 @@ func (h *StrictHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetLegacyLink handles GET /legacy-links/{kind}/{scope}
+func (h *StrictHandler) GetLegacyLink(w http.ResponseWriter, r *http.Request) {
+	var request GetLegacyLinkRequestObject
+	request.Kind = Kind(r.PathValue("kind"))
+	if !request.Kind.IsValid() {
+		http.Error(w, "invalid kind", http.StatusBadRequest)
+		return
+	}
+	request.Scope = LinkScope(r.PathValue("scope"))
+	if !request.Scope.IsValid() {
+		http.Error(w, "invalid scope", http.StatusBadRequest)
+		return
+	}
+
+	response, err := h.ssi.GetLegacyLink(r.Context(), request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := response.VisitGetLegacyLinkResponseObject(w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 // RegisterStrictHandlers registers all strict handlers with the http.ServeMux.
 func RegisterStrictHandlers(mux *http.ServeMux, ssi StrictServerInterface) {
 	h := NewStrictHandler(ssi)
@@ -119,4 +144,5 @@ func RegisterStrictHandlers(mux *http.ServeMux, ssi StrictServerInterface) {
 	mux.HandleFunc("GET /items/{id}", h.GetItem)
 	mux.HandleFunc("PUT /items/{id}", h.UpdateItem)
 	mux.HandleFunc("DELETE /items/{id}", h.DeleteItem)
+	mux.HandleFunc("GET /legacy-links/{kind}/{scope}", h.GetLegacyLink)
 }

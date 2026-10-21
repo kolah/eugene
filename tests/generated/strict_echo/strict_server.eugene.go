@@ -93,6 +93,26 @@ func (h *StrictEchoHandler) DeleteItem(ctx echo.Context) error {
 	return response.VisitDeleteItemResponseObject(ctx.Response().Writer)
 }
 
+// GetLegacyLink handles GET /legacy-links/{kind}/{scope}
+func (h *StrictEchoHandler) GetLegacyLink(ctx echo.Context) error {
+	var request GetLegacyLinkRequestObject
+	request.Kind = Kind(ctx.Param("kind"))
+	if !request.Kind.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid kind")
+	}
+	request.Scope = LinkScope(ctx.Param("scope"))
+	if !request.Scope.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid scope")
+	}
+
+	response, err := h.ssi.GetLegacyLink(ctx.Request().Context(), request)
+	if err != nil {
+		return err
+	}
+
+	return response.VisitGetLegacyLinkResponseObject(ctx.Response().Writer)
+}
+
 // RegisterStrictHandlers registers all strict handlers with the Echo instance.
 func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	h := NewStrictHandler(ssi)
@@ -102,6 +122,7 @@ func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	router.GET("/items/:id", h.GetItem)
 	router.PUT("/items/:id", h.UpdateItem)
 	router.DELETE("/items/:id", h.DeleteItem)
+	router.GET("/legacy-links/:kind/:scope", h.GetLegacyLink)
 }
 
 // RegisterStrictHandlersWithBaseURL registers all strict handlers with a base URL.
@@ -113,4 +134,5 @@ func RegisterStrictHandlersWithBaseURL(router Router, ssi StrictServerInterface,
 	router.GET(baseURL+"/items/:id", h.GetItem)
 	router.PUT(baseURL+"/items/:id", h.UpdateItem)
 	router.DELETE(baseURL+"/items/:id", h.DeleteItem)
+	router.GET(baseURL+"/legacy-links/:kind/:scope", h.GetLegacyLink)
 }

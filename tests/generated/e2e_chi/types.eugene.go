@@ -123,3 +123,15 @@ const (
 	StatusActive    Status = "active"
 	StatusCompleted Status = "completed"
 )
+
+func (e Status) IsValid() bool {
+	switch e {
+	case "pending":
+		return true
+	case "active":
+		return true
+	case "completed":
+		return true
+	}
+	return false
+}

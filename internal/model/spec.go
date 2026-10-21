@@ -28,6 +28,14 @@ func (s *Spec) SchemaByRef(ref string) *Schema {
 	return nil
 }
 
+// IsStringEnum reports whether schema, or the schema it references, is a string enum.
+func (s *Spec) IsStringEnum(schema *Schema) bool {
+	if schema != nil && schema.Ref != "" {
+		schema = s.SchemaByRef(schema.Ref)
+	}
+	return schema != nil && schema.Type == TypeString && len(schema.Enum) > 0
+}
+
 type Info struct {
 	Title       string
 	Description string

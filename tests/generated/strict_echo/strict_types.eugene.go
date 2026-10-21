@@ -7,6 +7,26 @@ import (
 	"net/http"
 )
 
+type Kind string
+
+const (
+	KindPost     Kind = "post"
+	KindFolder   Kind = "folder"
+	KindCategory Kind = "category"
+)
+
+func (e Kind) IsValid() bool {
+	switch e {
+	case "post":
+		return true
+	case "folder":
+		return true
+	case "category":
+		return true
+	}
+	return false
+}
+
 // ListItemsRequestObject represents the request for ListItems.
 type ListItemsRequestObject struct {
 	Limit *int // query parameter
@@ -20,6 +40,12 @@ type CreateItemRequestObject struct {
 // UpdateItemRequestObject represents the request for UpdateItem.
 type UpdateItemRequestObject struct {
 	Body NewItem
+}
+
+// GetLegacyLinkRequestObject represents the request for GetLegacyLink.
+type GetLegacyLinkRequestObject struct {
+	Kind  Kind      // path parameter
+	Scope LinkScope // path parameter
 }
 
 // ListItemsResponseObject is the interface for ListItems responses.
@@ -90,6 +116,19 @@ func (r DeleteItem204Response) VisitDeleteItemResponseObject(w http.ResponseWrit
 	return nil
 }
 
+// GetLegacyLinkResponseObject is the interface for GetLegacyLink responses.
+type GetLegacyLinkResponseObject interface {
+	VisitGetLegacyLinkResponseObject(w http.ResponseWriter) error
+}
+
+// GetLegacyLink204Response is the response for GetLegacyLink with status 204.
+type GetLegacyLink204Response struct{}
+
+func (r GetLegacyLink204Response) VisitGetLegacyLinkResponseObject(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
 // StrictServerInterface is the strict server interface with typed request/response.
 type StrictServerInterface interface {
 	// ListItems
@@ -102,4 +141,6 @@ type StrictServerInterface interface {
 	UpdateItem(ctx context.Context, request UpdateItemRequestObject) (UpdateItemResponseObject, error)
 	// DeleteItem
 	DeleteItem(ctx context.Context) (DeleteItemResponseObject, error)
+	// GetLegacyLink
+	GetLegacyLink(ctx context.Context, request GetLegacyLinkRequestObject) (GetLegacyLinkResponseObject, error)
 }

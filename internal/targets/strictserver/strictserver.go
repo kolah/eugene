@@ -80,6 +80,7 @@ type parameterData struct {
 	GoName   string
 	Type     string
 	Required bool
+	IsEnum   bool
 }
 
 type requestBodyData struct {
@@ -127,6 +128,7 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 				GoName:   golang.PascalCase(p.Name),
 				Type:     paramType,
 				Required: p.Required,
+				IsEnum:   spec.IsStringEnum(p.Schema),
 			}
 			if paramType == "time.Time" {
 				timeImport = true

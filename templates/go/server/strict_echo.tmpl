@@ -38,6 +38,11 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 	} else {
 		request.{{ .GoName }} = parsed
 	}
+{{- else if .IsEnum }}
+	request.{{ .GoName }} = {{ .Type }}(ctx.Param("{{ .Name }}"))
+	if !request.{{ .GoName }}.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+	}
 {{- else }}
 	request.{{ .GoName }} = ctx.Param("{{ .Name }}")
 {{- end }}

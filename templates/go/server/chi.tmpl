@@ -37,6 +37,16 @@ const (
 	{{ $enum.Name }}{{ . | pascalCase }} {{ $enum.Name }} = "{{ . }}"
 {{- end }}
 )
+
+func (e {{ $enum.Name }}) IsValid() bool {
+	switch e {
+	{{- range $enum.Values }}
+	case "{{ . }}":
+		return true
+	{{- end }}
+	}
+	return false
+}
 {{- end }}
 {{- if .Features.HasStreaming }}
 
@@ -134,6 +144,12 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 {{- if eq .Type "uuid.UUID" }}
 	{{ .GoName | camelCase }}, err := uuid.Parse(chi.URLParam(r, "{{ .Name }}"))
 	if err != nil {
+		http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
+		return
+	}
+{{- else if .IsEnum }}
+	{{ .GoName | camelCase }} := {{ .Type }}(chi.URLParam(r, "{{ .Name }}"))
+	if !{{ .GoName | camelCase }}.IsValid() {
 		http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
 		return
 	}

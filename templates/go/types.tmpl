@@ -125,6 +125,16 @@ const (
 	{{ $name }}{{ pascalCase (printf "%v" $v) }} {{ $name }} = {{ enumLiteral $s $v }}
 {{- end }}
 )
+
+func (e {{ $name }}) IsValid() bool {
+	switch e {
+	{{- range $s.Enum }}
+	case {{ enumLiteral $s . }}:
+		return true
+	{{- end }}
+	}
+	return false
+}
 {{- end }}
 {{- end -}}
 {{- /* unionType template - generates json.RawMessage based union */ -}}

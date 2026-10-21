@@ -6,6 +6,26 @@ import (
 	"strconv"
 )
 
+type Kind string
+
+const (
+	KindPost     Kind = "post"
+	KindFolder   Kind = "folder"
+	KindCategory Kind = "category"
+)
+
+func (e Kind) IsValid() bool {
+	switch e {
+	case "post":
+		return true
+	case "folder":
+		return true
+	case "category":
+		return true
+	}
+	return false
+}
+
 type ListItemsQueryParams struct {
 	Limit *int
 }
@@ -21,6 +41,8 @@ type ServerInterface interface {
 	UpdateItem(w http.ResponseWriter, r *http.Request)
 	// DeleteItem
 	DeleteItem(w http.ResponseWriter, r *http.Request)
+	// GetLegacyLink
+	GetLegacyLink(w http.ResponseWriter, r *http.Request, kind Kind, scope LinkScope)
 }
 
 type ServerInterfaceWrapper struct {
@@ -56,6 +78,20 @@ func (w *ServerInterfaceWrapper) DeleteItem(rw http.ResponseWriter, r *http.Requ
 	w.Handler.DeleteItem(rw, r)
 }
 
+func (w *ServerInterfaceWrapper) GetLegacyLink(rw http.ResponseWriter, r *http.Request) {
+	kind := Kind(r.PathValue("kind"))
+	if !kind.IsValid() {
+		http.Error(rw, "invalid kind", http.StatusBadRequest)
+		return
+	}
+	scope := LinkScope(r.PathValue("scope"))
+	if !scope.IsValid() {
+		http.Error(rw, "invalid scope", http.StatusBadRequest)
+		return
+	}
+	w.Handler.GetLegacyLink(rw, r, kind, scope)
+}
+
 func Handler(si ServerInterface) http.Handler {
 	return HandlerWithOptions(si, StdlibServerOptions{})
 }
@@ -74,6 +110,7 @@ func HandlerWithOptions(si ServerInterface, options StdlibServerOptions) http.Ha
 	mux.HandleFunc("GET "+options.BaseURL+"/items/{id}", wrapper.GetItem)
 	mux.HandleFunc("PUT "+options.BaseURL+"/items/{id}", wrapper.UpdateItem)
 	mux.HandleFunc("DELETE "+options.BaseURL+"/items/{id}", wrapper.DeleteItem)
+	mux.HandleFunc("GET "+options.BaseURL+"/legacy-links/{kind}/{scope}", wrapper.GetLegacyLink)
 
 	var handler http.Handler = mux
 	for i := len(options.Middlewares) - 1; i >= 0; i-- {

@@ -28,3 +28,13 @@ const (
 	StatusCompleted Status = "completed"
 	StatusFailed    Status = "failed"
 )
+
+func (e Status) IsValid() bool {
+	switch e {
+	case "completed":
+		return true
+	case "failed":
+		return true
+	}
+	return false
+}

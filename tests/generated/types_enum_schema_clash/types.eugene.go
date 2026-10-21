@@ -18,3 +18,15 @@ const (
 	NotificationTypeEnumSms   NotificationTypeEnum = "sms"
 	NotificationTypeEnumPush  NotificationTypeEnum = "push"
 )
+
+func (e NotificationTypeEnum) IsValid() bool {
+	switch e {
+	case "email":
+		return true
+	case "sms":
+		return true
+	case "push":
+		return true
+	}
+	return false
+}

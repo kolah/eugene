@@ -18,3 +18,15 @@ const (
 	MarkApplicationForDevCloudResponseEnumApproved MarkApplicationForDevCloudResponseEnum = "approved"
 	MarkApplicationForDevCloudResponseEnumRejected MarkApplicationForDevCloudResponseEnum = "rejected"
 )
+
+func (e MarkApplicationForDevCloudResponseEnum) IsValid() bool {
+	switch e {
+	case "pending":
+		return true
+	case "approved":
+		return true
+	case "rejected":
+		return true
+	}
+	return false
+}

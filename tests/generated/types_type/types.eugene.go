@@ -18,8 +18,34 @@ const (
 	StatusCancelled Status = "cancelled"
 )
 
+func (e Status) IsValid() bool {
+	switch e {
+	case "pending":
+		return true
+	case "active":
+		return true
+	case "completed":
+		return true
+	case "cancelled":
+		return true
+	}
+	return false
+}
+
 const (
 	Priority1 Priority = 1
 	Priority2 Priority = 2
 	Priority3 Priority = 3
 )
+
+func (e Priority) IsValid() bool {
+	switch e {
+	case 1:
+		return true
+	case 2:
+		return true
+	case 3:
+		return true
+	}
+	return false
+}

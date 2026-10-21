@@ -7,6 +7,26 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+type Kind string
+
+const (
+	KindPost     Kind = "post"
+	KindFolder   Kind = "folder"
+	KindCategory Kind = "category"
+)
+
+func (e Kind) IsValid() bool {
+	switch e {
+	case "post":
+		return true
+	case "folder":
+		return true
+	case "category":
+		return true
+	}
+	return false
+}
+
 type ListItemsQueryParams struct {
 	Limit *int `query:"limit"`
 }
@@ -22,6 +42,8 @@ type ServerInterface interface {
 	UpdateItem(ctx echo.Context) error
 	// DeleteItem
 	DeleteItem(ctx echo.Context) error
+	// GetLegacyLink
+	GetLegacyLink(ctx echo.Context, kind Kind, scope LinkScope) error
 }
 
 type ServerInterfaceWrapper struct {
@@ -52,6 +74,18 @@ func (w *ServerInterfaceWrapper) DeleteItem(ctx echo.Context) error {
 	return w.Handler.DeleteItem(ctx)
 }
 
+func (w *ServerInterfaceWrapper) GetLegacyLink(ctx echo.Context) error {
+	kind := Kind(ctx.Param("kind"))
+	if !kind.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid kind")
+	}
+	scope := LinkScope(ctx.Param("scope"))
+	if !scope.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid scope")
+	}
+	return w.Handler.GetLegacyLink(ctx, kind, scope)
+}
+
 func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
@@ -60,6 +94,7 @@ func RegisterHandlers(router Router, si ServerInterface) {
 	router.GET("/items/:id", wrapper.GetItem)
 	router.PUT("/items/:id", wrapper.UpdateItem)
 	router.DELETE("/items/:id", wrapper.DeleteItem)
+	router.GET("/legacy-links/:kind/:scope", wrapper.GetLegacyLink)
 }
 
 func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL string) {
@@ -70,4 +105,5 @@ func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL stri
 	router.GET(baseURL+"/items/:id", wrapper.GetItem)
 	router.PUT(baseURL+"/items/:id", wrapper.UpdateItem)
 	router.DELETE(baseURL+"/items/:id", wrapper.DeleteItem)
+	router.GET(baseURL+"/legacy-links/:kind/:scope", wrapper.GetLegacyLink)
 }

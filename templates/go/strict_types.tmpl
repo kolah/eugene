@@ -22,6 +22,16 @@ const (
 	{{ $enum.Name }}{{ . | pascalCase }} {{ $enum.Name }} = "{{ . }}"
 {{- end }}
 )
+
+func (e {{ $enum.Name }}) IsValid() bool {
+	switch e {
+	{{- range $enum.Values }}
+	case "{{ . }}":
+		return true
+	{{- end }}
+	}
+	return false
+}
 {{- end }}
 
 {{- /* Generate request types for each operation */ -}}

@@ -9,7 +9,7 @@ import (
 
 type User struct {
 	ID            uuid.UUID `json:"id"`
-	Email         string    `json:"email" validate:"required,email" db:"email_address"`
+	Email         string    `json:"email" db:"email_address" validate:"required,email"`
 	DisplayName   *string   `json:"nickname,omitempty"`
 	InternalField *string   `json:"-"`
 	CreatedAt     *string   `json:"created_at"`

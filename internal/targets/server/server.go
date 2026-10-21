@@ -113,6 +113,7 @@ type parameterData struct {
 	GoName      string
 	Required    bool
 	Type        string
+	IsEnum      bool
 }
 
 type querystringData struct {
@@ -177,6 +178,7 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 				GoName:   golang.PascalCase(p.Name),
 				Required: p.Required,
 				Type:     paramType,
+				IsEnum:   spec.IsStringEnum(p.Schema),
 			}
 
 			switch p.In {

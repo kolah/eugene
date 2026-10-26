@@ -69,7 +69,19 @@ func (h *StrictChiHandler) {{ .ID }}(w http.ResponseWriter, r *http.Request) {
 {{- end }}
 {{- end }}
 {{- range .QueryParams }}
-{{- if hasPrefix .Type "[]" }}
+{{- if .IsEnumArray }}
+	if values := r.URL.Query()["{{ .Name }}"]; len(values) > 0 {
+		typed := make({{ .Type }}, len(values))
+		for i, v := range values {
+			typed[i] = {{ trimPrefix .Type "[]" }}(v)
+			if !typed[i].IsValid() {
+				http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
+				return
+			}
+		}
+		{{ if .Required }}request.{{ .GoName }} = typed{{ else }}request.{{ .GoName }} = &typed{{ end }}
+	}
+{{- else if hasPrefix .Type "[]" }}
 	if values := r.URL.Query()["{{ .Name }}"]; len(values) > 0 {
 		{{ if .Required }}request.{{ .GoName }} = values{{ else }}request.{{ .GoName }} = &values{{ end }}
 	}

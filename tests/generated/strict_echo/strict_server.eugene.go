@@ -93,6 +93,31 @@ func (h *StrictEchoHandler) DeleteItem(ctx echo.Context) error {
 	return response.VisitDeleteItemResponseObject(ctx.Response().Writer)
 }
 
+// ListLegacyLinks handles GET /legacy-links
+func (h *StrictEchoHandler) ListLegacyLinks(ctx echo.Context) error {
+	var request ListLegacyLinksRequestObject
+	if values := ctx.QueryParams()["kinds"]; len(values) > 0 {
+		request.Kinds = values
+	}
+	if values := ctx.QueryParams()["scopes"]; len(values) > 0 {
+		typed := make([]LinkScope, len(values))
+		for i, v := range values {
+			typed[i] = LinkScope(v)
+			if !typed[i].IsValid() {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid scopes")
+			}
+		}
+		request.Scopes = &typed
+	}
+
+	response, err := h.ssi.ListLegacyLinks(ctx.Request().Context(), request)
+	if err != nil {
+		return err
+	}
+
+	return response.VisitListLegacyLinksResponseObject(ctx.Response().Writer)
+}
+
 // GetLegacyLink handles GET /legacy-links/{kind}/{scope}
 func (h *StrictEchoHandler) GetLegacyLink(ctx echo.Context) error {
 	var request GetLegacyLinkRequestObject
@@ -122,6 +147,7 @@ func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	router.GET("/items/:id", h.GetItem)
 	router.PUT("/items/:id", h.UpdateItem)
 	router.DELETE("/items/:id", h.DeleteItem)
+	router.GET("/legacy-links", h.ListLegacyLinks)
 	router.GET("/legacy-links/:kind/:scope", h.GetLegacyLink)
 }
 
@@ -134,5 +160,6 @@ func RegisterStrictHandlersWithBaseURL(router Router, ssi StrictServerInterface,
 	router.GET(baseURL+"/items/:id", h.GetItem)
 	router.PUT(baseURL+"/items/:id", h.UpdateItem)
 	router.DELETE(baseURL+"/items/:id", h.DeleteItem)
+	router.GET(baseURL+"/legacy-links", h.ListLegacyLinks)
 	router.GET(baseURL+"/legacy-links/:kind/:scope", h.GetLegacyLink)
 }

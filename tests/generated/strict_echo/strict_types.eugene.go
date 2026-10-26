@@ -42,6 +42,12 @@ type UpdateItemRequestObject struct {
 	Body NewItem
 }
 
+// ListLegacyLinksRequestObject represents the request for ListLegacyLinks.
+type ListLegacyLinksRequestObject struct {
+	Kinds  []string     // query parameter
+	Scopes *[]LinkScope // query parameter
+}
+
 // GetLegacyLinkRequestObject represents the request for GetLegacyLink.
 type GetLegacyLinkRequestObject struct {
 	Kind  Kind      // path parameter
@@ -116,6 +122,19 @@ func (r DeleteItem204Response) VisitDeleteItemResponseObject(w http.ResponseWrit
 	return nil
 }
 
+// ListLegacyLinksResponseObject is the interface for ListLegacyLinks responses.
+type ListLegacyLinksResponseObject interface {
+	VisitListLegacyLinksResponseObject(w http.ResponseWriter) error
+}
+
+// ListLegacyLinks204Response is the response for ListLegacyLinks with status 204.
+type ListLegacyLinks204Response struct{}
+
+func (r ListLegacyLinks204Response) VisitListLegacyLinksResponseObject(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
 // GetLegacyLinkResponseObject is the interface for GetLegacyLink responses.
 type GetLegacyLinkResponseObject interface {
 	VisitGetLegacyLinkResponseObject(w http.ResponseWriter) error
@@ -141,6 +160,8 @@ type StrictServerInterface interface {
 	UpdateItem(ctx context.Context, request UpdateItemRequestObject) (UpdateItemResponseObject, error)
 	// DeleteItem
 	DeleteItem(ctx context.Context) (DeleteItemResponseObject, error)
+	// ListLegacyLinks
+	ListLegacyLinks(ctx context.Context, request ListLegacyLinksRequestObject) (ListLegacyLinksResponseObject, error)
 	// GetLegacyLink
 	GetLegacyLink(ctx context.Context, request GetLegacyLinkRequestObject) (GetLegacyLinkResponseObject, error)
 }

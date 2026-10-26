@@ -110,6 +110,35 @@ func (h *StrictHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListLegacyLinks handles GET /legacy-links
+func (h *StrictHandler) ListLegacyLinks(w http.ResponseWriter, r *http.Request) {
+	var request ListLegacyLinksRequestObject
+	if values := r.URL.Query()["kinds"]; len(values) > 0 {
+		request.Kinds = values
+	}
+	if values := r.URL.Query()["scopes"]; len(values) > 0 {
+		typed := make([]LinkScope, len(values))
+		for i, v := range values {
+			typed[i] = LinkScope(v)
+			if !typed[i].IsValid() {
+				http.Error(w, "invalid scopes", http.StatusBadRequest)
+				return
+			}
+		}
+		request.Scopes = &typed
+	}
+
+	response, err := h.ssi.ListLegacyLinks(r.Context(), request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := response.VisitListLegacyLinksResponseObject(w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 // GetLegacyLink handles GET /legacy-links/{kind}/{scope}
 func (h *StrictHandler) GetLegacyLink(w http.ResponseWriter, r *http.Request) {
 	var request GetLegacyLinkRequestObject
@@ -144,5 +173,6 @@ func RegisterStrictHandlers(mux *http.ServeMux, ssi StrictServerInterface) {
 	mux.HandleFunc("GET /items/{id}", h.GetItem)
 	mux.HandleFunc("PUT /items/{id}", h.UpdateItem)
 	mux.HandleFunc("DELETE /items/{id}", h.DeleteItem)
+	mux.HandleFunc("GET /legacy-links", h.ListLegacyLinks)
 	mux.HandleFunc("GET /legacy-links/{kind}/{scope}", h.GetLegacyLink)
 }

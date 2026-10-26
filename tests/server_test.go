@@ -215,6 +215,12 @@ type enumEchoHandler struct {
 	serverEcho.ServerInterface
 	kind  serverEcho.Kind
 	scope serverEcho.LinkScope
+	list  serverEcho.ListLegacyLinksQueryParams
+}
+
+func (h *enumEchoHandler) ListLegacyLinks(ctx echo.Context, params serverEcho.ListLegacyLinksQueryParams) error {
+	h.list = params
+	return ctx.NoContent(http.StatusNoContent)
 }
 
 func (h *enumEchoHandler) GetLegacyLink(ctx echo.Context, kind serverEcho.Kind, scope serverEcho.LinkScope) error {
@@ -226,6 +232,12 @@ type enumChiHandler struct {
 	serverChi.ServerInterface
 	kind  serverChi.Kind
 	scope serverChi.LinkScope
+	list  serverChi.ListLegacyLinksQueryParams
+}
+
+func (h *enumChiHandler) ListLegacyLinks(w http.ResponseWriter, _ *http.Request, params serverChi.ListLegacyLinksQueryParams) {
+	h.list = params
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *enumChiHandler) GetLegacyLink(w http.ResponseWriter, _ *http.Request, kind serverChi.Kind, scope serverChi.LinkScope) {
@@ -237,6 +249,12 @@ type enumStdlibHandler struct {
 	serverStdlib.ServerInterface
 	kind  serverStdlib.Kind
 	scope serverStdlib.LinkScope
+	list  serverStdlib.ListLegacyLinksQueryParams
+}
+
+func (h *enumStdlibHandler) ListLegacyLinks(w http.ResponseWriter, _ *http.Request, params serverStdlib.ListLegacyLinksQueryParams) {
+	h.list = params
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *enumStdlibHandler) GetLegacyLink(w http.ResponseWriter, _ *http.Request, kind serverStdlib.Kind, scope serverStdlib.LinkScope) {
@@ -246,7 +264,13 @@ func (h *enumStdlibHandler) GetLegacyLink(w http.ResponseWriter, _ *http.Request
 
 type enumStrictEchoHandler struct {
 	strictEcho.StrictServerInterface
-	req strictEcho.GetLegacyLinkRequestObject
+	req  strictEcho.GetLegacyLinkRequestObject
+	list strictEcho.ListLegacyLinksRequestObject
+}
+
+func (h *enumStrictEchoHandler) ListLegacyLinks(_ context.Context, req strictEcho.ListLegacyLinksRequestObject) (strictEcho.ListLegacyLinksResponseObject, error) {
+	h.list = req
+	return strictEcho.ListLegacyLinks204Response{}, nil
 }
 
 func (h *enumStrictEchoHandler) GetLegacyLink(_ context.Context, req strictEcho.GetLegacyLinkRequestObject) (strictEcho.GetLegacyLinkResponseObject, error) {
@@ -256,7 +280,13 @@ func (h *enumStrictEchoHandler) GetLegacyLink(_ context.Context, req strictEcho.
 
 type enumStrictChiHandler struct {
 	strictChi.StrictServerInterface
-	req strictChi.GetLegacyLinkRequestObject
+	req  strictChi.GetLegacyLinkRequestObject
+	list strictChi.ListLegacyLinksRequestObject
+}
+
+func (h *enumStrictChiHandler) ListLegacyLinks(_ context.Context, req strictChi.ListLegacyLinksRequestObject) (strictChi.ListLegacyLinksResponseObject, error) {
+	h.list = req
+	return strictChi.ListLegacyLinks204Response{}, nil
 }
 
 func (h *enumStrictChiHandler) GetLegacyLink(_ context.Context, req strictChi.GetLegacyLinkRequestObject) (strictChi.GetLegacyLinkResponseObject, error) {
@@ -266,7 +296,13 @@ func (h *enumStrictChiHandler) GetLegacyLink(_ context.Context, req strictChi.Ge
 
 type enumStrictStdlibHandler struct {
 	strictStdlib.StrictServerInterface
-	req strictStdlib.GetLegacyLinkRequestObject
+	req  strictStdlib.GetLegacyLinkRequestObject
+	list strictStdlib.ListLegacyLinksRequestObject
+}
+
+func (h *enumStrictStdlibHandler) ListLegacyLinks(_ context.Context, req strictStdlib.ListLegacyLinksRequestObject) (strictStdlib.ListLegacyLinksResponseObject, error) {
+	h.list = req
+	return strictStdlib.ListLegacyLinks204Response{}, nil
 }
 
 func (h *enumStrictStdlibHandler) GetLegacyLink(_ context.Context, req strictStdlib.GetLegacyLinkRequestObject) (strictStdlib.GetLegacyLinkResponseObject, error) {
@@ -337,6 +373,72 @@ func TestEnumPathParams(t *testing.T) {
 				tt.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 				require.Equal(t, http.StatusBadRequest, rec.Code, path)
 			}
+		})
+	}
+}
+
+func TestEnumArrayQueryParams(t *testing.T) {
+	echoH := &enumEchoHandler{}
+	echoServer := echo.New()
+	serverEcho.RegisterHandlers(echoServer, echoH)
+
+	chiH := &enumChiHandler{}
+	stdlibH := &enumStdlibHandler{}
+
+	strictEchoH := &enumStrictEchoHandler{}
+	strictEchoServer := echo.New()
+	strictEcho.RegisterStrictHandlers(strictEchoServer, strictEchoH)
+
+	strictChiH := &enumStrictChiHandler{}
+	strictChiRouter := chi.NewRouter()
+	strictChi.RegisterStrictHandlers(strictChiRouter, strictChiH)
+
+	strictStdlibH := &enumStrictStdlibHandler{}
+	strictStdlibMux := http.NewServeMux()
+	strictStdlib.RegisterStrictHandlers(strictStdlibMux, strictStdlibH)
+
+	kinds := []string{"post", "folder"}
+	tests := []struct {
+		name    string
+		handler http.Handler
+		check   func(t *testing.T)
+	}{
+		{"echo", echoServer, func(t *testing.T) {
+			require.Equal(t, kinds, echoH.list.Kinds)
+			require.Equal(t, &[]serverEcho.LinkScope{serverEcho.LinkScopePublic, serverEcho.LinkScopePrivate}, echoH.list.Scopes)
+		}},
+		{"chi", serverChi.Handler(chiH), func(t *testing.T) {
+			require.Equal(t, kinds, chiH.list.Kinds)
+			require.Equal(t, &[]serverChi.LinkScope{serverChi.LinkScopePublic, serverChi.LinkScopePrivate}, chiH.list.Scopes)
+		}},
+		{"stdlib", serverStdlib.Handler(stdlibH), func(t *testing.T) {
+			require.Equal(t, kinds, stdlibH.list.Kinds)
+			require.Equal(t, &[]serverStdlib.LinkScope{serverStdlib.LinkScopePublic, serverStdlib.LinkScopePrivate}, stdlibH.list.Scopes)
+		}},
+		{"strict echo", strictEchoServer, func(t *testing.T) {
+			require.Equal(t, kinds, strictEchoH.list.Kinds)
+			require.Equal(t, &[]strictEcho.LinkScope{strictEcho.LinkScopePublic, strictEcho.LinkScopePrivate}, strictEchoH.list.Scopes)
+		}},
+		{"strict chi", strictChiRouter, func(t *testing.T) {
+			require.Equal(t, kinds, strictChiH.list.Kinds)
+			require.Equal(t, &[]strictChi.LinkScope{strictChi.LinkScopePublic, strictChi.LinkScopePrivate}, strictChiH.list.Scopes)
+		}},
+		{"strict stdlib", strictStdlibMux, func(t *testing.T) {
+			require.Equal(t, kinds, strictStdlibH.list.Kinds)
+			require.Equal(t, &[]strictStdlib.LinkScope{strictStdlib.LinkScopePublic, strictStdlib.LinkScopePrivate}, strictStdlibH.list.Scopes)
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			tt.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/legacy-links?kinds=post&kinds=folder&scopes=public&scopes=private", nil))
+			require.Equal(t, http.StatusNoContent, rec.Code)
+			tt.check(t)
+
+			rec = httptest.NewRecorder()
+			tt.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/legacy-links?kinds=post&scopes=public&scopes=secret", nil))
+			require.Equal(t, http.StatusBadRequest, rec.Code)
 		})
 	}
 }

@@ -122,6 +122,13 @@ type DeleteItemResponse struct {
 	Raw        *http.Response
 }
 
+// ListLegacyLinksResponse contains typed response data for ListLegacyLinks.
+type ListLegacyLinksResponse struct {
+	StatusCode int
+	JSON204    *struct{}
+	Raw        *http.Response
+}
+
 // GetLegacyLinkResponse contains typed response data for GetLegacyLink.
 type GetLegacyLinkResponse struct {
 	StatusCode int
@@ -369,6 +376,54 @@ func (c *Client) DeleteItem(ctx context.Context) (*DeleteItemResponse, error) {
 	return result, nil
 }
 
+func (c *Client) ListLegacyLinks(ctx context.Context, params *ListLegacyLinksParams) (*ListLegacyLinksResponse, error) {
+	path := "/legacy-links"
+	if params != nil {
+		q := url.Values{}
+		q.Set("kinds", fmt.Sprint(params.Kinds))
+		if params.Scopes != nil {
+			q.Set("scopes", fmt.Sprint(*params.Scopes))
+		}
+		if len(q) > 0 {
+			path += "?" + q.Encode()
+		}
+	}
+
+	var bodyReader io.Reader
+
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+path, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	httpReq.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	result := &ListLegacyLinksResponse{
+		StatusCode: resp.StatusCode,
+		Raw:        resp,
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return result, fmt.Errorf("reading response: %w", err)
+	}
+
+	switch resp.StatusCode {
+	case 204:
+	}
+
+	if resp.StatusCode >= 400 {
+		return result, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return result, nil
+}
+
 func (c *Client) GetLegacyLink(ctx context.Context, kind string, scope LinkScope) (*GetLegacyLinkResponse, error) {
 	path := "/legacy-links/{kind}/{scope}"
 	path = strings.Replace(path, "{kind}", fmt.Sprint(kind), 1)
@@ -411,4 +466,9 @@ func (c *Client) GetLegacyLink(ctx context.Context, kind string, scope LinkScope
 
 type ListItemsParams struct {
 	Limit *int
+}
+
+type ListLegacyLinksParams struct {
+	Kinds  []string
+	Scopes *[]LinkScope
 }

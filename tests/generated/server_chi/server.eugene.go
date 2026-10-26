@@ -32,6 +32,11 @@ type ListItemsQueryParams struct {
 	Limit *int
 }
 
+type ListLegacyLinksQueryParams struct {
+	Kinds  []string
+	Scopes *[]LinkScope
+}
+
 type ServerInterface interface {
 	// ListItems
 	ListItems(w http.ResponseWriter, r *http.Request, params ListItemsQueryParams)
@@ -43,6 +48,8 @@ type ServerInterface interface {
 	UpdateItem(w http.ResponseWriter, r *http.Request)
 	// DeleteItem
 	DeleteItem(w http.ResponseWriter, r *http.Request)
+	// ListLegacyLinks
+	ListLegacyLinks(w http.ResponseWriter, r *http.Request, params ListLegacyLinksQueryParams)
 	// GetLegacyLink
 	GetLegacyLink(w http.ResponseWriter, r *http.Request, kind Kind, scope LinkScope)
 }
@@ -78,6 +85,25 @@ func (w *ServerInterfaceWrapper) UpdateItem(rw http.ResponseWriter, r *http.Requ
 
 func (w *ServerInterfaceWrapper) DeleteItem(rw http.ResponseWriter, r *http.Request) {
 	w.Handler.DeleteItem(rw, r)
+}
+
+func (w *ServerInterfaceWrapper) ListLegacyLinks(rw http.ResponseWriter, r *http.Request) {
+	var params ListLegacyLinksQueryParams
+	if values := r.URL.Query()["kinds"]; len(values) > 0 {
+		params.Kinds = values
+	}
+	if values := r.URL.Query()["scopes"]; len(values) > 0 {
+		typed := make([]LinkScope, len(values))
+		for i, v := range values {
+			typed[i] = LinkScope(v)
+			if !typed[i].IsValid() {
+				http.Error(rw, "invalid scopes", http.StatusBadRequest)
+				return
+			}
+		}
+		params.Scopes = &typed
+	}
+	w.Handler.ListLegacyLinks(rw, r, params)
 }
 
 func (w *ServerInterfaceWrapper) GetLegacyLink(rw http.ResponseWriter, r *http.Request) {
@@ -117,6 +143,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Method("GET", options.BaseURL+"/items/{id}", http.HandlerFunc(wrapper.GetItem))
 	r.Method("PUT", options.BaseURL+"/items/{id}", http.HandlerFunc(wrapper.UpdateItem))
 	r.Method("DELETE", options.BaseURL+"/items/{id}", http.HandlerFunc(wrapper.DeleteItem))
+	r.Method("GET", options.BaseURL+"/legacy-links", http.HandlerFunc(wrapper.ListLegacyLinks))
 	r.Method("GET", options.BaseURL+"/legacy-links/{kind}/{scope}", http.HandlerFunc(wrapper.GetLegacyLink))
 
 	return r

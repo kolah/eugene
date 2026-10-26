@@ -48,7 +48,18 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 {{- end }}
 {{- end }}
 {{- range .QueryParams }}
-{{- if hasPrefix .Type "[]" }}
+{{- if .IsEnumArray }}
+	if values := ctx.QueryParams()["{{ .Name }}"]; len(values) > 0 {
+		typed := make({{ .Type }}, len(values))
+		for i, v := range values {
+			typed[i] = {{ trimPrefix .Type "[]" }}(v)
+			if !typed[i].IsValid() {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+			}
+		}
+		{{ if .Required }}request.{{ .GoName }} = typed{{ else }}request.{{ .GoName }} = &typed{{ end }}
+	}
+{{- else if hasPrefix .Type "[]" }}
 	if values := ctx.QueryParams()["{{ .Name }}"]; len(values) > 0 {
 		{{ if .Required }}request.{{ .GoName }} = values{{ else }}request.{{ .GoName }} = &values{{ end }}
 	}

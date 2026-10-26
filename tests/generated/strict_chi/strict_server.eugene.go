@@ -112,6 +112,35 @@ func (h *StrictChiHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListLegacyLinks handles GET /legacy-links
+func (h *StrictChiHandler) ListLegacyLinks(w http.ResponseWriter, r *http.Request) {
+	var request ListLegacyLinksRequestObject
+	if values := r.URL.Query()["kinds"]; len(values) > 0 {
+		request.Kinds = values
+	}
+	if values := r.URL.Query()["scopes"]; len(values) > 0 {
+		typed := make([]LinkScope, len(values))
+		for i, v := range values {
+			typed[i] = LinkScope(v)
+			if !typed[i].IsValid() {
+				http.Error(w, "invalid scopes", http.StatusBadRequest)
+				return
+			}
+		}
+		request.Scopes = &typed
+	}
+
+	response, err := h.ssi.ListLegacyLinks(r.Context(), request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := response.VisitListLegacyLinksResponseObject(w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 // GetLegacyLink handles GET /legacy-links/{kind}/{scope}
 func (h *StrictChiHandler) GetLegacyLink(w http.ResponseWriter, r *http.Request) {
 	var request GetLegacyLinkRequestObject
@@ -146,5 +175,6 @@ func RegisterStrictHandlers(r chi.Router, ssi StrictServerInterface) {
 	r.Method("GET", "/items/{id}", http.HandlerFunc(h.GetItem))
 	r.Method("PUT", "/items/{id}", http.HandlerFunc(h.UpdateItem))
 	r.Method("DELETE", "/items/{id}", http.HandlerFunc(h.DeleteItem))
+	r.Method("GET", "/legacy-links", http.HandlerFunc(h.ListLegacyLinks))
 	r.Method("GET", "/legacy-links/{kind}/{scope}", http.HandlerFunc(h.GetLegacyLink))
 }

@@ -156,6 +156,17 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
 	}
+{{- range .QueryParams }}
+{{- if .IsEnumArray }}
+	if params.{{ .GoName }} != nil {
+		for _, v := range {{ if not .Required }}*{{ end }}params.{{ .GoName }} {
+			if !v.IsValid() {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+			}
+		}
+	}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- if .HasHeaderParams }}
 	var headers {{ .ID | pascalCase }}HeaderParams

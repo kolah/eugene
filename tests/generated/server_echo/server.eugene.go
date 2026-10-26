@@ -31,6 +31,11 @@ type ListItemsQueryParams struct {
 	Limit *int `query:"limit"`
 }
 
+type ListLegacyLinksQueryParams struct {
+	Kinds  []string     `query:"kinds"`
+	Scopes *[]LinkScope `query:"scopes"`
+}
+
 type ServerInterface interface {
 	// ListItems
 	ListItems(ctx echo.Context, params ListItemsQueryParams) error
@@ -42,6 +47,8 @@ type ServerInterface interface {
 	UpdateItem(ctx echo.Context) error
 	// DeleteItem
 	DeleteItem(ctx echo.Context) error
+	// ListLegacyLinks
+	ListLegacyLinks(ctx echo.Context, params ListLegacyLinksQueryParams) error
 	// GetLegacyLink
 	GetLegacyLink(ctx echo.Context, kind Kind, scope LinkScope) error
 }
@@ -74,6 +81,21 @@ func (w *ServerInterfaceWrapper) DeleteItem(ctx echo.Context) error {
 	return w.Handler.DeleteItem(ctx)
 }
 
+func (w *ServerInterfaceWrapper) ListLegacyLinks(ctx echo.Context) error {
+	var params ListLegacyLinksQueryParams
+	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	}
+	if params.Scopes != nil {
+		for _, v := range *params.Scopes {
+			if !v.IsValid() {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid scopes")
+			}
+		}
+	}
+	return w.Handler.ListLegacyLinks(ctx, params)
+}
+
 func (w *ServerInterfaceWrapper) GetLegacyLink(ctx echo.Context) error {
 	kind := Kind(ctx.Param("kind"))
 	if !kind.IsValid() {
@@ -94,6 +116,7 @@ func RegisterHandlers(router Router, si ServerInterface) {
 	router.GET("/items/:id", wrapper.GetItem)
 	router.PUT("/items/:id", wrapper.UpdateItem)
 	router.DELETE("/items/:id", wrapper.DeleteItem)
+	router.GET("/legacy-links", wrapper.ListLegacyLinks)
 	router.GET("/legacy-links/:kind/:scope", wrapper.GetLegacyLink)
 }
 
@@ -105,5 +128,6 @@ func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL stri
 	router.GET(baseURL+"/items/:id", wrapper.GetItem)
 	router.PUT(baseURL+"/items/:id", wrapper.UpdateItem)
 	router.DELETE(baseURL+"/items/:id", wrapper.DeleteItem)
+	router.GET(baseURL+"/legacy-links", wrapper.ListLegacyLinks)
 	router.GET(baseURL+"/legacy-links/:kind/:scope", wrapper.GetLegacyLink)
 }

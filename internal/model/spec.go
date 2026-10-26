@@ -36,6 +36,11 @@ func (s *Spec) IsStringEnum(schema *Schema) bool {
 	return schema != nil && schema.Type == TypeString && len(schema.Enum) > 0
 }
 
+// IsStringEnumRefArray reports whether schema is an array whose items reference a string enum.
+func (s *Spec) IsStringEnumRefArray(schema *Schema) bool {
+	return schema != nil && schema.Type == TypeArray && schema.Items != nil && schema.Items.Ref != "" && s.IsStringEnum(schema.Items)
+}
+
 type Info struct {
 	Title       string
 	Description string

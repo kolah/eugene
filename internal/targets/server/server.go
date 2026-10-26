@@ -114,6 +114,7 @@ type parameterData struct {
 	Required    bool
 	Type        string
 	IsEnum      bool
+	IsEnumArray bool
 }
 
 type querystringData struct {
@@ -174,11 +175,12 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 		for _, p := range op.Parameters {
 			paramType := schemaToGoType(p.Schema, resolver, op.ID, p.Name)
 			pd := parameterData{
-				Name:     p.Name,
-				GoName:   golang.PascalCase(p.Name),
-				Required: p.Required,
-				Type:     paramType,
-				IsEnum:   spec.IsStringEnum(p.Schema),
+				Name:        p.Name,
+				GoName:      golang.PascalCase(p.Name),
+				Required:    p.Required,
+				Type:        paramType,
+				IsEnum:      spec.IsStringEnum(p.Schema),
+				IsEnumArray: spec.IsStringEnumRefArray(p.Schema),
 			}
 
 			switch p.In {

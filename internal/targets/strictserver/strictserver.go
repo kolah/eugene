@@ -76,11 +76,12 @@ type querystringData struct {
 }
 
 type parameterData struct {
-	Name     string
-	GoName   string
-	Type     string
-	Required bool
-	IsEnum   bool
+	Name        string
+	GoName      string
+	Type        string
+	Required    bool
+	IsEnum      bool
+	IsEnumArray bool
 }
 
 type requestBodyData struct {
@@ -124,11 +125,12 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 		for _, p := range op.Parameters {
 			paramType := schemaToGoType(p.Schema, resolver, op.ID, p.Name)
 			pd := parameterData{
-				Name:     p.Name,
-				GoName:   golang.PascalCase(p.Name),
-				Type:     paramType,
-				Required: p.Required,
-				IsEnum:   spec.IsStringEnum(p.Schema),
+				Name:        p.Name,
+				GoName:      golang.PascalCase(p.Name),
+				Type:        paramType,
+				Required:    p.Required,
+				IsEnum:      spec.IsStringEnum(p.Schema),
+				IsEnumArray: spec.IsStringEnumRefArray(p.Schema),
 			}
 			if paramType == "time.Time" {
 				timeImport = true

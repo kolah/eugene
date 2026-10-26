@@ -30,6 +30,11 @@ type ListItemsQueryParams struct {
 	Limit *int
 }
 
+type ListLegacyLinksQueryParams struct {
+	Kinds  []string
+	Scopes *[]LinkScope
+}
+
 type ServerInterface interface {
 	// ListItems
 	ListItems(w http.ResponseWriter, r *http.Request, params ListItemsQueryParams)
@@ -41,6 +46,8 @@ type ServerInterface interface {
 	UpdateItem(w http.ResponseWriter, r *http.Request)
 	// DeleteItem
 	DeleteItem(w http.ResponseWriter, r *http.Request)
+	// ListLegacyLinks
+	ListLegacyLinks(w http.ResponseWriter, r *http.Request, params ListLegacyLinksQueryParams)
 	// GetLegacyLink
 	GetLegacyLink(w http.ResponseWriter, r *http.Request, kind Kind, scope LinkScope)
 }
@@ -78,6 +85,25 @@ func (w *ServerInterfaceWrapper) DeleteItem(rw http.ResponseWriter, r *http.Requ
 	w.Handler.DeleteItem(rw, r)
 }
 
+func (w *ServerInterfaceWrapper) ListLegacyLinks(rw http.ResponseWriter, r *http.Request) {
+	var params ListLegacyLinksQueryParams
+	if values := r.URL.Query()["kinds"]; len(values) > 0 {
+		params.Kinds = values
+	}
+	if values := r.URL.Query()["scopes"]; len(values) > 0 {
+		typed := make([]LinkScope, len(values))
+		for i, v := range values {
+			typed[i] = LinkScope(v)
+			if !typed[i].IsValid() {
+				http.Error(rw, "invalid scopes", http.StatusBadRequest)
+				return
+			}
+		}
+		params.Scopes = &typed
+	}
+	w.Handler.ListLegacyLinks(rw, r, params)
+}
+
 func (w *ServerInterfaceWrapper) GetLegacyLink(rw http.ResponseWriter, r *http.Request) {
 	kind := Kind(r.PathValue("kind"))
 	if !kind.IsValid() {
@@ -110,6 +136,7 @@ func HandlerWithOptions(si ServerInterface, options StdlibServerOptions) http.Ha
 	mux.HandleFunc("GET "+options.BaseURL+"/items/{id}", wrapper.GetItem)
 	mux.HandleFunc("PUT "+options.BaseURL+"/items/{id}", wrapper.UpdateItem)
 	mux.HandleFunc("DELETE "+options.BaseURL+"/items/{id}", wrapper.DeleteItem)
+	mux.HandleFunc("GET "+options.BaseURL+"/legacy-links", wrapper.ListLegacyLinks)
 	mux.HandleFunc("GET "+options.BaseURL+"/legacy-links/{kind}/{scope}", wrapper.GetLegacyLink)
 
 	var handler http.Handler = mux

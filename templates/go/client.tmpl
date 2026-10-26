@@ -312,7 +312,17 @@ func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams 
 	if params != nil {
 		q := url.Values{}
 {{- range .QueryParams }}
-{{- if .Required }}
+{{- if and (hasPrefix .Type "[]") .Required }}
+		for _, v := range params.{{ .GoName }} {
+			q.Add("{{ .Name }}", fmt.Sprint(v))
+		}
+{{- else if hasPrefix .Type "[]" }}
+		if params.{{ .GoName }} != nil {
+			for _, v := range *params.{{ .GoName }} {
+				q.Add("{{ .Name }}", fmt.Sprint(v))
+			}
+		}
+{{- else if .Required }}
 		q.Set("{{ .Name }}", fmt.Sprint(params.{{ .GoName }}))
 {{- else }}
 		if params.{{ .GoName }} != nil {
@@ -357,7 +367,17 @@ func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams 
 	if params != nil {
 		q := url.Values{}
 {{- range .QueryParams }}
-{{- if .Required }}
+{{- if and (hasPrefix .Type "[]") .Required }}
+		for _, v := range params.{{ .GoName }} {
+			q.Add("{{ .Name }}", fmt.Sprint(v))
+		}
+{{- else if hasPrefix .Type "[]" }}
+		if params.{{ .GoName }} != nil {
+			for _, v := range *params.{{ .GoName }} {
+				q.Add("{{ .Name }}", fmt.Sprint(v))
+			}
+		}
+{{- else if .Required }}
 		q.Set("{{ .Name }}", fmt.Sprint(params.{{ .GoName }}))
 {{- else }}
 		if params.{{ .GoName }} != nil {

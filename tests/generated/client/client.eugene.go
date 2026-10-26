@@ -380,9 +380,13 @@ func (c *Client) ListLegacyLinks(ctx context.Context, params *ListLegacyLinksPar
 	path := "/legacy-links"
 	if params != nil {
 		q := url.Values{}
-		q.Set("kinds", fmt.Sprint(params.Kinds))
+		for _, v := range params.Kinds {
+			q.Add("kinds", fmt.Sprint(v))
+		}
 		if params.Scopes != nil {
-			q.Set("scopes", fmt.Sprint(*params.Scopes))
+			for _, v := range *params.Scopes {
+				q.Add("scopes", fmt.Sprint(v))
+			}
 		}
 		if len(q) > 0 {
 			path += "?" + q.Encode()

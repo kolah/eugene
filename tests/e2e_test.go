@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	routingClient "github.com/kolah/eugene/v2/tests/generated/client"
 	basic "github.com/kolah/eugene/v2/tests/generated/e2e_echo"
 	chiGen "github.com/kolah/eugene/v2/tests/generated/e2e_chi"
 	stdlibGen "github.com/kolah/eugene/v2/tests/generated/e2e_stdlib"
@@ -702,6 +704,24 @@ func TestE2EHeaderParams(t *testing.T) {
 		assert.Contains(t, string(body), `"filter":"test"`)
 		assert.Contains(t, string(body), `"requestId":"req-12345"`)
 	})
+}
+
+func TestE2EArrayQueryParams(t *testing.T) {
+	var query url.Values
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query = r.URL.Query()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := routingClient.NewClient(server.URL)
+	_, err := client.ListLegacyLinks(context.Background(), &routingClient.ListLegacyLinksParams{
+		Kinds:  []string{"post", "folder"},
+		Scopes: &[]routingClient.LinkScope{routingClient.LinkScopePublic, routingClient.LinkScopePrivate},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"post", "folder"}, query["kinds"])
+	assert.Equal(t, []string{"public", "private"}, query["scopes"])
 }
 
 func TestE2EChiServer(t *testing.T) {

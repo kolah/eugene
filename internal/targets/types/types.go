@@ -27,7 +27,7 @@ type templateData struct {
 	MappedImports    []string
 }
 
-func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string, cfg *config.TypesConfig, opts *config.OutputOptions, importMapping map[string]string, registry *golang.EnumRegistry) (string, error) {
+func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string, cfg *config.TypesConfig, opts *config.OutputOptions, importMapping map[string]string, registry *golang.EnumRegistry) (string, []string, error) {
 	schemaLookup := func(ref string) *model.Schema {
 		return spec.SchemaByRef(ref)
 	}
@@ -43,6 +43,10 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 		for _, prop := range schema.Properties {
 			resolver.ResolveType(prop.Schema, schema.Name, prop.Name)
 		}
+	}
+
+	if err := resolver.Err(); err != nil {
+		return "", nil, err
 	}
 
 	needsTime := false
@@ -98,5 +102,6 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 		MappedImports:    resolver.MappedImports(),
 	}
 
-	return engine.Execute("go/types.tmpl", data)
+	content, err := engine.Execute("go/types.tmpl", data)
+	return content, resolver.Warnings(), err
 }

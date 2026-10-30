@@ -12,6 +12,10 @@ type Message struct {
 
 type List []string
 
+type Time struct {
+	Hour *int `json:"hour,omitempty"`
+}
+
 type MessageContextValue struct {
 	Type string          `json:"-"`
 	Raw  json.RawMessage `json:"-"`
@@ -128,6 +132,68 @@ func (u *Value) AsValueVariant4ItemList() (*[]ValueVariant4Item, error) {
 
 func (u *Value) AsList() (*List, error) {
 	var v List
+	if err := json.Unmarshal(u.Raw, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+type Slot struct {
+	Type string          `json:"-"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (u *Slot) UnmarshalJSON(data []byte) error {
+	u.Type = ""
+	u.Raw = data
+	return nil
+}
+
+func (u Slot) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
+func (u *Slot) AsTime() (*Time, error) {
+	var v Time
+	if err := json.Unmarshal(u.Raw, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func (u *Slot) AsTime2() (*time.Time, error) {
+	var v time.Time
+	if err := json.Unmarshal(u.Raw, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+type Window struct {
+	Type string          `json:"-"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (u *Window) UnmarshalJSON(data []byte) error {
+	u.Type = ""
+	u.Raw = data
+	return nil
+}
+
+func (u Window) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
+func (u *Window) AsTime() (*Time, error) {
+	var v Time
+	if err := json.Unmarshal(u.Raw, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func (u *Window) AsStartsAt() (*time.Time, error) {
+	var v time.Time
 	if err := json.Unmarshal(u.Raw, &v); err != nil {
 		return nil, err
 	}

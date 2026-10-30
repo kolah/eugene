@@ -307,7 +307,18 @@ func (s *PaymentSource) AsCard() (*Card, error) { ... }
 func (s *PaymentSource) AsBankAccount() (*BankAccount, error) { ... }
 ```
 
-A `$ref` variant's accessor is named after the schema. An inline variant's accessor is named after its Go type: `string` gives `AsString()`, `[]string` gives `AsStringList()`, `map[string]int` gives `AsIntMap()` and `time.Time` gives `AsTime()`. An inline object generates a type and uses its name, such as `AsPaymentSourceVariant()`. Inline variants with the same Go type share one accessor, so `string` and `format: date` together give a single `AsString()`. If an inline variant's name clashes with a different type in the union, the inline one takes a numeric suffix (`AsString2()`).
+A `$ref` variant's accessor is named after the schema. An inline variant's accessor is named after its Go type: `string` gives `AsString()`, `[]string` gives `AsStringList()`, `map[string]int` gives `AsIntMap()` and `time.Time` gives `AsTime()`. An inline object generates a type and uses its name, such as `AsPaymentSourceVariant()`. Inline variants with the same Go type share one accessor, so `string` and `format: date` together give a single `AsString()`. If an inline variant's name clashes with a different type in the union, the inline one takes a numeric suffix (`AsString2()`) and generation prints a warning.
+
+Set `x-oink-go-name` on an inline variant to choose its accessor name. It also keeps the name stable if variants are reordered, and two variants can use it to keep separate accessors for the same Go type. Using a name already taken in the union is a generation error.
+
+```yaml
+Schedule:
+  oneOf:
+    - $ref: "#/components/schemas/Time"     # AsTime()
+    - type: string
+      format: date-time
+      x-oink-go-name: StartsAt              # AsStartsAt() returns *time.Time
+```
 
 ## SSE/Streaming Support
 

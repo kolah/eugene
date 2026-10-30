@@ -1,0 +1,13 @@
+openapi: 3.2.0
+info:
+  title: Union Variant Name Clash Test
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Value:
+      anyOf:
+        - type: string
+          x-oink-go-name: Same
+        - type: integer
+          x-oink-go-name: Same

@@ -56,3 +56,12 @@ func TestUnionPreservesRawValue(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, date, string(out))
 }
+
+func TestUnionGoNameAccessor(t *testing.T) {
+	var w union.Window
+	require.NoError(t, json.Unmarshal([]byte(`"2024-01-02T03:04:05Z"`), &w))
+
+	got, err := w.AsStartsAt()
+	require.NoError(t, err)
+	require.Equal(t, 2024, got.Year())
+}

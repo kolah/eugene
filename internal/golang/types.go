@@ -1,6 +1,7 @@
 package golang
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -173,6 +174,8 @@ type TypeResolver struct {
 	mappedImports map[string]bool
 	registry      *EnumRegistry                   // shared registry for stable enum naming
 	schemaLookup  func(ref string) *model.Schema // lookup schemas by $ref
+	warnings      []string
+	errs          []error
 }
 
 // ResolvedType represents a type that needs to be generated.
@@ -231,6 +234,16 @@ func NewTypeResolverWithSchemaLookup(cfg *config.TypesConfig, importMapping map[
 }
 
 // NestedTypes returns all nested types collected during resolution.
+// Warnings returns naming problems that generation worked around.
+func (r *TypeResolver) Warnings() []string {
+	return r.warnings
+}
+
+// Err returns naming problems that prevent generation.
+func (r *TypeResolver) Err() error {
+	return errors.Join(r.errs...)
+}
+
 func (r *TypeResolver) NestedTypes() []ResolvedType {
 	return r.nestedTypes
 }
@@ -468,12 +481,22 @@ func (r *TypeResolver) resolveUnion(s *model.Schema, parentName, fieldName strin
 	}
 	r.seen[nestedName] = true
 
-	// Ref variants keep their type name, so reserve those before naming inline ones
+	// Ref variants and x-oink-go-name are fixed, so reserve them before generating names
 	usedNames := make(map[string]bool, len(schemas))
 	for _, variant := range schemas {
 		if variant.Ref != "" {
 			usedNames[refToTypeName(variant.Ref)] = true
 		}
+	}
+	for _, variant := range schemas {
+		goName := GoNameWithExtension(variant, "")
+		if variant.Ref != "" || goName == "" {
+			continue
+		}
+		if usedNames[goName] {
+			r.errs = append(r.errs, fmt.Errorf("union %s: x-oink-go-name %q is already used by another variant", nestedName, goName))
+		}
+		usedNames[goName] = true
 	}
 
 	var variants []UnionVariant
@@ -494,12 +517,20 @@ func (r *TypeResolver) resolveUnion(s *model.Schema, parentName, fieldName strin
 			if strings.Contains(v.TypeName, nestedName+fieldName) {
 				inlineTypes++
 			}
-			// Same Go type decodes identically, so one accessor covers them all
-			if inlineGoTypes[v.TypeName] {
-				continue
+			if goName := GoNameWithExtension(variant, ""); goName != "" {
+				v.Name = goName
+			} else {
+				// Same Go type decodes identically, so one accessor covers them all
+				if inlineGoTypes[v.TypeName] {
+					continue
+				}
+				inlineGoTypes[v.TypeName] = true
+				baseName := variantName(v.TypeName)
+				v.Name = uniqueVariantName(baseName, usedNames)
+				if v.Name != baseName {
+					r.warnings = append(r.warnings, fmt.Sprintf("union %s: inline variant named As%s because As%s is taken; set x-oink-go-name to choose a name", nestedName, v.Name, baseName))
+				}
 			}
-			inlineGoTypes[v.TypeName] = true
-			v.Name = uniqueVariantName(variantName(v.TypeName), usedNames)
 		}
 		v.Schema = variant
 

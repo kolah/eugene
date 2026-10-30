@@ -20,6 +20,7 @@ type Generator struct {
 	engine        templates.Engine
 	registry      *golang.EnumRegistry
 	resolverState *golang.TemplateResolverState
+	warnings      []string
 }
 
 type Output struct {
@@ -43,6 +44,11 @@ func New(cfg *config.Config) (*Generator, error) {
 		engine:        engine,
 		resolverState: resolverState,
 	}, nil
+}
+
+// Warnings returns the problems reported during Generate.
+func (g *Generator) Warnings() []string {
+	return g.warnings
 }
 
 func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error) {
@@ -89,10 +95,11 @@ func (g *Generator) Generate(spec *model.Spec, specData []byte) ([]Output, error
 
 	if g.config.HasTarget("types") {
 		target := types.New()
-		content, err := target.Generate(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, &g.config.Go.OutputOptions, g.config.Go.ImportMapping, g.registry)
+		content, warnings, err := target.Generate(g.engine, spec, g.config.Go.Package, &g.config.Go.Types, &g.config.Go.OutputOptions, g.config.Go.ImportMapping, g.registry)
 		if err != nil {
 			return nil, fmt.Errorf("generating types: %w", err)
 		}
+		g.warnings = append(g.warnings, warnings...)
 		formatted, err := golang.Format([]byte(content))
 		if err != nil {
 			return nil, fmt.Errorf("formatting types: %w", err)

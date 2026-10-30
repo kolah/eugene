@@ -277,6 +277,94 @@ func TestTypeResolver_UnionRefKeepsNameOverInlineVariant(t *testing.T) {
 	require.Equal(t, "String", variants[1].Name)
 }
 
+func goNamed(name string, s model.Schema) *model.Schema {
+	s.Extensions = &model.SchemaExtensions{GoName: name}
+	return &s
+}
+
+func TestTypeResolver_UnionVariantGoNameOverridesAccessor(t *testing.T) {
+	r := NewTypeResolver(&config.TypesConfig{})
+	r.ResolveType(&model.Schema{
+		AnyOf: []*model.Schema{
+			{Type: model.TypeString},
+			goNamed("StartsAt", model.Schema{Type: model.TypeString, Format: "date-time"}),
+			goNamed("EndsAt", model.Schema{Type: model.TypeString, Format: "date-time"}),
+		},
+	}, "Pet", "Value")
+
+	variants := r.NestedTypes()[0].Variants
+	require.Len(t, variants, 3)
+	require.Equal(t, "String", variants[0].Name)
+	require.Equal(t, "StartsAt", variants[1].Name)
+	require.Equal(t, "time.Time", variants[1].TypeName)
+	require.Equal(t, "EndsAt", variants[2].Name)
+	require.Empty(t, r.Warnings())
+	require.NoError(t, r.Err())
+}
+
+func TestTypeResolver_UnionVariantGoNameIsReservedBeforeGeneratedNames(t *testing.T) {
+	r := NewTypeResolver(&config.TypesConfig{})
+	r.ResolveType(&model.Schema{
+		AnyOf: []*model.Schema{
+			{Type: model.TypeString},
+			goNamed("String", model.Schema{Type: model.TypeInteger}),
+		},
+	}, "Pet", "Value")
+
+	variants := r.NestedTypes()[0].Variants
+	require.Equal(t, "String2", variants[0].Name)
+	require.Equal(t, "String", variants[1].Name)
+}
+
+func TestTypeResolver_UnionWarnsWhenNameGetsSuffix(t *testing.T) {
+	r := NewTypeResolver(&config.TypesConfig{})
+	r.ResolveType(&model.Schema{
+		OneOf: []*model.Schema{
+			{Ref: "#/components/schemas/Time"},
+			{Type: model.TypeString, Format: "date-time"},
+		},
+	}, "Pet", "Value")
+
+	require.Equal(t, []string{
+		"union PetValue: inline variant named AsTime2 because AsTime is taken; set x-oink-go-name to choose a name",
+	}, r.Warnings())
+}
+
+func TestTypeResolver_UnionSameTypeVariantsDoNotWarn(t *testing.T) {
+	r := NewTypeResolver(&config.TypesConfig{})
+	r.ResolveType(&model.Schema{
+		AnyOf: []*model.Schema{
+			{Type: model.TypeString},
+			{Type: model.TypeString, Format: "uri"},
+		},
+	}, "Pet", "Value")
+
+	require.Empty(t, r.Warnings())
+}
+
+func TestTypeResolver_UnionGoNameClashIsAnError(t *testing.T) {
+	tests := []struct {
+		name     string
+		variants []*model.Schema
+	}{
+		{"two go names", []*model.Schema{
+			goNamed("Same", model.Schema{Type: model.TypeString}),
+			goNamed("Same", model.Schema{Type: model.TypeInteger}),
+		}},
+		{"go name and ref", []*model.Schema{
+			goNamed("Cat", model.Schema{Type: model.TypeString}),
+			{Ref: "#/components/schemas/Cat"},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewTypeResolver(&config.TypesConfig{})
+			r.ResolveType(&model.Schema{OneOf: tt.variants}, "Pet", "Value")
+			require.ErrorContains(t, r.Err(), "union PetValue: x-oink-go-name")
+		})
+	}
+}
+
 func TestTypeResolver_AllOf(t *testing.T) {
 	r := NewTypeResolver(&config.TypesConfig{})
 

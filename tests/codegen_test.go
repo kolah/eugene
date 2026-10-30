@@ -384,6 +384,39 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 	}
 }
 
+func generateFromSpec(t *testing.T, specFile string) (*codegen.Generator, error) {
+	t.Helper()
+
+	specPath, err := filepath.Abs(specFile)
+	require.NoError(t, err)
+	result, err := loader.LoadFile(specPath)
+	require.NoError(t, err)
+	spec, err := loader.Transform(result)
+	require.NoError(t, err)
+
+	gen, err := codegen.New(&config.Config{
+		Spec: specPath,
+		Go:   config.GoConfig{Package: "gen", Targets: []string{"types"}},
+	})
+	require.NoError(t, err)
+
+	_, err = gen.Generate(spec, result.RawData)
+	return gen, err
+}
+
+func TestUnionNameClashWarning(t *testing.T) {
+	gen, err := generateFromSpec(t, "testdata/specs/types/union-inline.yaml")
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"union Slot: inline variant named AsTime2 because AsTime is taken; set x-oink-go-name to choose a name",
+	}, gen.Warnings())
+}
+
+func TestUnionGoNameClashFailsGeneration(t *testing.T) {
+	_, err := generateFromSpec(t, "testdata/specs/types/union-go-name-clash.yaml")
+	require.ErrorContains(t, err, `union Value: x-oink-go-name "Same" is already used`)
+}
+
 func TestCustomTemplateOverride(t *testing.T) {
 	testDir, err := os.Getwd()
 	require.NoError(t, err)

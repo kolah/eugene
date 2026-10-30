@@ -156,6 +156,10 @@ func runGoGenerate(target string) func(cmd *cobra.Command, args []string) error 
 			return fmt.Errorf("generating code: %w", err)
 		}
 
+		for _, w := range gen.Warnings() {
+			cmd.PrintErrf("Warning: %s\n", w)
+		}
+
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		if dryRun {
 			for _, out := range outputs {

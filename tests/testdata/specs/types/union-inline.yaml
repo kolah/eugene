@@ -51,3 +51,19 @@ components:
       type: array
       items:
         type: string
+    Time:
+      type: object
+      properties:
+        hour:
+          type: integer
+    Slot:
+      oneOf:
+        - $ref: "#/components/schemas/Time"
+        - type: string
+          format: date-time
+    Window:
+      oneOf:
+        - $ref: "#/components/schemas/Time"
+        - type: string
+          format: date-time
+          x-oink-go-name: StartsAt

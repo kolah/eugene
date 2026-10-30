@@ -108,6 +108,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /days/{day}:
+    get:
+      operationId: getDay
+      parameters:
+        - name: day
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: X-Until
+          in: header
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Dates echoed back
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DayRecord"
+
   /resources:
     post:
       operationId: createResource
@@ -329,3 +357,28 @@ components:
           type: number
         height:
           type: number
+
+    DayRecord:
+      type: object
+      required: [day]
+      properties:
+        day:
+          type: string
+          format: date
+        since:
+          type: string
+          format: date
+        until:
+          type: string
+          format: date
+
+    Day:
+      type: string
+      format: date
+
+    DayOrCount:
+      oneOf:
+        - $ref: "#/components/schemas/Day"
+        - type: string
+          format: date
+        - type: integer

@@ -102,6 +102,25 @@ func (h *StrictEchoHandler) GetItem(ctx echo.Context) error {
 	return response.VisitGetItemResponseObject(ctx.Response().Writer)
 }
 
+// GetDay handles GET /days/{day}
+func (h *StrictEchoHandler) GetDay(ctx echo.Context) error {
+	var request GetDayRequestObject
+	request.Day = ctx.Param("day")
+	if v := ctx.QueryParam("since"); v != "" {
+		request.Since = &v
+	}
+	if v := ctx.Request().Header.Get("X-Until"); v != "" {
+		request.XUntil = &v
+	}
+
+	response, err := h.ssi.GetDay(ctx.Request().Context(), request)
+	if err != nil {
+		return err
+	}
+
+	return response.VisitGetDayResponseObject(ctx.Response().Writer)
+}
+
 // CreateResource handles POST /resources
 func (h *StrictEchoHandler) CreateResource(ctx echo.Context) error {
 	var request CreateResourceRequestObject
@@ -179,6 +198,7 @@ func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	router.POST("/echo/form", h.EchoForm)
 	router.POST("/echo/multipart", h.EchoMultipart)
 	router.GET("/items/:id", h.GetItem)
+	router.GET("/days/:day", h.GetDay)
 	router.POST("/resources", h.CreateResource)
 	router.DELETE("/resources/:id", h.DeleteResource)
 	router.GET("/session", h.GetSession)
@@ -194,6 +214,7 @@ func RegisterStrictHandlersWithBaseURL(router Router, ssi StrictServerInterface,
 	router.POST(baseURL+"/echo/form", h.EchoForm)
 	router.POST(baseURL+"/echo/multipart", h.EchoMultipart)
 	router.GET(baseURL+"/items/:id", h.GetItem)
+	router.GET(baseURL+"/days/:day", h.GetDay)
 	router.POST(baseURL+"/resources", h.CreateResource)
 	router.DELETE(baseURL+"/resources/:id", h.DeleteResource)
 	router.GET(baseURL+"/session", h.GetSession)

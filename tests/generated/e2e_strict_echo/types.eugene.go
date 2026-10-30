@@ -72,6 +72,14 @@ type Rectangle struct {
 	Height float64 `json:"height"`
 }
 
+type DayRecord struct {
+	Day   string  `json:"day"`
+	Since *string `json:"since,omitempty"`
+	Until *string `json:"until,omitempty"`
+}
+
+type Day string
+
 type EchoPayloadNested struct {
 	Value *string `json:"value,omitempty"`
 }
@@ -112,6 +120,45 @@ func (u *Shape) AsRectangle() (*Rectangle, error) {
 		return nil, fmt.Errorf("not a Rectangle, type is %s", u.Type)
 	}
 	var v Rectangle
+	if err := json.Unmarshal(u.Raw, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+type DayOrCount struct {
+	Type string          `json:"-"`
+	Raw  json.RawMessage `json:"-"`
+}
+
+func (u *DayOrCount) UnmarshalJSON(data []byte) error {
+	u.Type = ""
+	u.Raw = data
+	return nil
+}
+
+func (u DayOrCount) MarshalJSON() ([]byte, error) {
+	return u.Raw, nil
+}
+
+func (u *DayOrCount) AsDay() (*Day, error) {
+	var v Day
+	if err := json.Unmarshal(u.Raw, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func (u *DayOrCount) AsString() (*string, error) {
+	var v string
+	if err := json.Unmarshal(u.Raw, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func (u *DayOrCount) AsInt() (*int, error) {
+	var v int
 	if err := json.Unmarshal(u.Raw, &v); err != nil {
 		return nil, err
 	}

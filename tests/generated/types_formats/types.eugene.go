@@ -9,7 +9,7 @@ type Record struct {
 	ID        *string    `json:"id,omitempty"`
 	Email     *string    `json:"email,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	UpdatedAt *string    `json:"updatedAt,omitempty"`
 	Website   *string    `json:"website,omitempty"`
 	IPAddress *string    `json:"ipAddress,omitempty"`
 	Data      *[]byte    `json:"data,omitempty"`

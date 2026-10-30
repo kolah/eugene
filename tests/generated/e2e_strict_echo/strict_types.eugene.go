@@ -31,6 +31,13 @@ type GetItemRequestObject struct {
 	XRetryCount *int    // header parameter
 }
 
+// GetDayRequestObject represents the request for GetDay.
+type GetDayRequestObject struct {
+	Day    string  // path parameter
+	Since  *string // query parameter
+	XUntil *string // header parameter
+}
+
 // CreateResourceRequestObject represents the request for CreateResource.
 type CreateResourceRequestObject struct {
 	Body NewResource
@@ -108,6 +115,20 @@ type GetItem404JSONResponse ErrorResponse
 func (r GetItem404JSONResponse) VisitGetItemResponseObject(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	return json.NewEncoder(w).Encode(r)
+}
+
+// GetDayResponseObject is the interface for GetDay responses.
+type GetDayResponseObject interface {
+	VisitGetDayResponseObject(w http.ResponseWriter) error
+}
+
+// GetDay200JSONResponse is the response for GetDay with status 200.
+type GetDay200JSONResponse DayRecord
+
+func (r GetDay200JSONResponse) VisitGetDayResponseObject(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	return json.NewEncoder(w).Encode(r)
 }
 
@@ -199,6 +220,8 @@ type StrictServerInterface interface {
 	EchoMultipart(ctx context.Context, request EchoMultipartRequestObject) (EchoMultipartResponseObject, error)
 	// GetItem
 	GetItem(ctx context.Context, request GetItemRequestObject) (GetItemResponseObject, error)
+	// GetDay
+	GetDay(ctx context.Context, request GetDayRequestObject) (GetDayResponseObject, error)
 	// CreateResource
 	CreateResource(ctx context.Context, request CreateResourceRequestObject) (CreateResourceResponseObject, error)
 	// DeleteResource

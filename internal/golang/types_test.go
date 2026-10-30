@@ -18,7 +18,7 @@ func TestGoType(t *testing.T) {
 		{"string", &model.Schema{Type: model.TypeString}, "string"},
 		{"string uuid", &model.Schema{Type: model.TypeString, Format: "uuid"}, "string"},
 		{"string date-time", &model.Schema{Type: model.TypeString, Format: "date-time"}, "time.Time"},
-		{"string date", &model.Schema{Type: model.TypeString, Format: "date"}, "time.Time"},
+		{"string date", &model.Schema{Type: model.TypeString, Format: "date"}, "string"},
 		{"string byte", &model.Schema{Type: model.TypeString, Format: "byte"}, "[]byte"},
 		{"string binary", &model.Schema{Type: model.TypeString, Format: "binary"}, "[]byte"},
 		{"integer", &model.Schema{Type: model.TypeInteger}, "int"},
@@ -100,7 +100,7 @@ func TestNeedsTimeImport(t *testing.T) {
 		{"nil", nil, false},
 		{"string", &model.Schema{Type: model.TypeString}, false},
 		{"date-time", &model.Schema{Type: model.TypeString, Format: "date-time"}, true},
-		{"date", &model.Schema{Type: model.TypeString, Format: "date"}, true},
+		{"date", &model.Schema{Type: model.TypeString, Format: "date"}, false},
 		{"array of date-time", &model.Schema{Type: model.TypeArray, Items: &model.Schema{Type: model.TypeString, Format: "date-time"}}, true},
 		{"object with date property", &model.Schema{
 			Type: model.TypeObject,

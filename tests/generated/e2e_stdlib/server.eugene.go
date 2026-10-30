@@ -28,6 +28,14 @@ type GetItemHeaderParams struct {
 	XRetryCount *int
 }
 
+type GetDayQueryParams struct {
+	Since *string
+}
+
+type GetDayHeaderParams struct {
+	XUntil *string
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(w http.ResponseWriter, r *http.Request)
@@ -37,6 +45,8 @@ type ServerInterface interface {
 	EchoMultipart(w http.ResponseWriter, r *http.Request, req EchoMultipartMultipartRequest)
 	// GetItem
 	GetItem(w http.ResponseWriter, r *http.Request, id string, params GetItemQueryParams, headers GetItemHeaderParams)
+	// GetDay
+	GetDay(w http.ResponseWriter, r *http.Request, day string, params GetDayQueryParams, headers GetDayHeaderParams)
 	// CreateResource
 	CreateResource(w http.ResponseWriter, r *http.Request)
 	// DeleteResource
@@ -113,6 +123,19 @@ func (w *ServerInterfaceWrapper) GetItem(rw http.ResponseWriter, r *http.Request
 	w.Handler.GetItem(rw, r, id, params, headers)
 }
 
+func (w *ServerInterfaceWrapper) GetDay(rw http.ResponseWriter, r *http.Request) {
+	day := r.PathValue("day")
+	var params GetDayQueryParams
+	if v := r.URL.Query().Get("since"); v != "" {
+		params.Since = &v
+	}
+	var headers GetDayHeaderParams
+	if v := r.Header.Get("X-Until"); v != "" {
+		headers.XUntil = &v
+	}
+	w.Handler.GetDay(rw, r, day, params, headers)
+}
+
 func (w *ServerInterfaceWrapper) CreateResource(rw http.ResponseWriter, r *http.Request) {
 	w.Handler.CreateResource(rw, r)
 }
@@ -151,6 +174,7 @@ func HandlerWithOptions(si ServerInterface, options StdlibServerOptions) http.Ha
 	mux.HandleFunc("POST "+options.BaseURL+"/echo/form", wrapper.EchoForm)
 	mux.HandleFunc("POST "+options.BaseURL+"/echo/multipart", wrapper.EchoMultipart)
 	mux.HandleFunc("GET "+options.BaseURL+"/items/{id}", wrapper.GetItem)
+	mux.HandleFunc("GET "+options.BaseURL+"/days/{day}", wrapper.GetDay)
 	mux.HandleFunc("POST "+options.BaseURL+"/resources", wrapper.CreateResource)
 	mux.HandleFunc("DELETE "+options.BaseURL+"/resources/{id}", wrapper.DeleteResource)
 	mux.HandleFunc("GET "+options.BaseURL+"/session", wrapper.GetSession)

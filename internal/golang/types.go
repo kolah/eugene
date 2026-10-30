@@ -53,8 +53,6 @@ func goStringType(format string) string {
 	switch format {
 	case "date-time":
 		return "time.Time"
-	case "date":
-		return "time.Time"
 	case "uuid":
 		return "string"
 	case "uri":
@@ -123,7 +121,7 @@ func NeedsTimeImport(s *model.Schema) bool {
 	if s == nil {
 		return false
 	}
-	if s.Type == model.TypeString && (s.Format == "date-time" || s.Format == "date") {
+	if s.Type == model.TypeString && s.Format == "date-time" {
 		return true
 	}
 	if s.Items != nil && NeedsTimeImport(s.Items) {
@@ -311,7 +309,7 @@ func (r *TypeResolver) ResolveType(s *model.Schema, parentName, fieldName string
 
 func (r *TypeResolver) goStringType(format string) string {
 	switch format {
-	case "date-time", "date":
+	case "date-time":
 		return "time.Time"
 	case "uuid":
 		return r.uuidType()

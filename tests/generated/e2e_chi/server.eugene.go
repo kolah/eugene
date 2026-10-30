@@ -30,6 +30,14 @@ type GetItemHeaderParams struct {
 	XRetryCount *int
 }
 
+type GetDayQueryParams struct {
+	Since *string
+}
+
+type GetDayHeaderParams struct {
+	XUntil *string
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(w http.ResponseWriter, r *http.Request)
@@ -39,6 +47,8 @@ type ServerInterface interface {
 	EchoMultipart(w http.ResponseWriter, r *http.Request, req EchoMultipartMultipartRequest)
 	// GetItem
 	GetItem(w http.ResponseWriter, r *http.Request, id string, params GetItemQueryParams, headers GetItemHeaderParams)
+	// GetDay
+	GetDay(w http.ResponseWriter, r *http.Request, day string, params GetDayQueryParams, headers GetDayHeaderParams)
 	// CreateResource
 	CreateResource(w http.ResponseWriter, r *http.Request)
 	// DeleteResource
@@ -115,6 +125,19 @@ func (w *ServerInterfaceWrapper) GetItem(rw http.ResponseWriter, r *http.Request
 	w.Handler.GetItem(rw, r, id, params, headers)
 }
 
+func (w *ServerInterfaceWrapper) GetDay(rw http.ResponseWriter, r *http.Request) {
+	day := chi.URLParam(r, "day")
+	var params GetDayQueryParams
+	if v := r.URL.Query().Get("since"); v != "" {
+		params.Since = &v
+	}
+	var headers GetDayHeaderParams
+	if v := r.Header.Get("X-Until"); v != "" {
+		headers.XUntil = &v
+	}
+	w.Handler.GetDay(rw, r, day, params, headers)
+}
+
 func (w *ServerInterfaceWrapper) CreateResource(rw http.ResponseWriter, r *http.Request) {
 	w.Handler.CreateResource(rw, r)
 }
@@ -158,6 +181,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Method("POST", options.BaseURL+"/echo/form", http.HandlerFunc(wrapper.EchoForm))
 	r.Method("POST", options.BaseURL+"/echo/multipart", http.HandlerFunc(wrapper.EchoMultipart))
 	r.Method("GET", options.BaseURL+"/items/{id}", http.HandlerFunc(wrapper.GetItem))
+	r.Method("GET", options.BaseURL+"/days/{day}", http.HandlerFunc(wrapper.GetDay))
 	r.Method("POST", options.BaseURL+"/resources", http.HandlerFunc(wrapper.CreateResource))
 	r.Method("DELETE", options.BaseURL+"/resources/{id}", http.HandlerFunc(wrapper.DeleteResource))
 	r.Method("GET", options.BaseURL+"/session", http.HandlerFunc(wrapper.GetSession))

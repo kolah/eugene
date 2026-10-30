@@ -29,6 +29,14 @@ type GetItemHeaderParams struct {
 	XRetryCount *int    `header:"X-Retry-Count"`
 }
 
+type GetDayQueryParams struct {
+	Since *string `query:"since"`
+}
+
+type GetDayHeaderParams struct {
+	XUntil *string `header:"X-Until"`
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(ctx echo.Context) error
@@ -38,6 +46,8 @@ type ServerInterface interface {
 	EchoMultipart(ctx echo.Context, req EchoMultipartMultipartRequest) error
 	// GetItem
 	GetItem(ctx echo.Context, id string, params GetItemQueryParams, headers GetItemHeaderParams) error
+	// GetDay
+	GetDay(ctx echo.Context, day string, params GetDayQueryParams, headers GetDayHeaderParams) error
 	// CreateResource
 	CreateResource(ctx echo.Context) error
 	// DeleteResource
@@ -94,6 +104,19 @@ func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 	return w.Handler.GetItem(ctx, id, params, headers)
 }
 
+func (w *ServerInterfaceWrapper) GetDay(ctx echo.Context) error {
+	day := ctx.Param("day")
+	var params GetDayQueryParams
+	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	}
+	var headers GetDayHeaderParams
+	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	}
+	return w.Handler.GetDay(ctx, day, params, headers)
+}
+
 func (w *ServerInterfaceWrapper) CreateResource(ctx echo.Context) error {
 	return w.Handler.CreateResource(ctx)
 }
@@ -122,6 +145,7 @@ func RegisterHandlers(router Router, si ServerInterface) {
 	router.POST("/echo/form", wrapper.EchoForm)
 	router.POST("/echo/multipart", wrapper.EchoMultipart)
 	router.GET("/items/:id", wrapper.GetItem)
+	router.GET("/days/:day", wrapper.GetDay)
 	router.POST("/resources", wrapper.CreateResource)
 	router.DELETE("/resources/:id", wrapper.DeleteResource)
 	router.GET("/session", wrapper.GetSession)
@@ -136,6 +160,7 @@ func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL stri
 	router.POST(baseURL+"/echo/form", wrapper.EchoForm)
 	router.POST(baseURL+"/echo/multipart", wrapper.EchoMultipart)
 	router.GET(baseURL+"/items/:id", wrapper.GetItem)
+	router.GET(baseURL+"/days/:day", wrapper.GetDay)
 	router.POST(baseURL+"/resources", wrapper.CreateResource)
 	router.DELETE(baseURL+"/resources/:id", wrapper.DeleteResource)
 	router.GET(baseURL+"/session", wrapper.GetSession)

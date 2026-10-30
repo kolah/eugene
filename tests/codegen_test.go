@@ -180,6 +180,12 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 			specFile:  "testdata/specs/types/anyof.yaml",
 		},
 		{
+			name:      "types_union_inline",
+			targets:   []string{"types"},
+			outputDir: "generated/types_union_inline",
+			specFile:  "testdata/specs/types/union-inline.yaml",
+		},
+		{
 			name:      "types_enum_schema_clash",
 			targets:   []string{"types"},
 			outputDir: "generated/types_enum_schema_clash",

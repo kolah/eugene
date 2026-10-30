@@ -168,7 +168,7 @@ func (u {{ $name }}) MarshalJSON() ([]byte, error) {
 }
 {{- range $t.Variants }}
 
-func (u *{{ $name }}) As{{ .TypeName }}() (*{{ .TypeName }}, error) {
+func (u *{{ $name }}) As{{ .Name }}() (*{{ .TypeName }}, error) {
 {{- if and $disc .DiscValue }}
 	if u.Type != {{ printf "%q" .DiscValue }} {
 		return nil, fmt.Errorf("not a {{ .TypeName }}, type is %s", u.Type)

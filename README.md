@@ -307,6 +307,8 @@ func (s *PaymentSource) AsCard() (*Card, error) { ... }
 func (s *PaymentSource) AsBankAccount() (*BankAccount, error) { ... }
 ```
 
+A `$ref` variant's accessor is named after the schema. An inline variant's accessor is named after its Go type: `string` gives `AsString()`, `[]string` gives `AsStringList()`, `map[string]int` gives `AsIntMap()` and `time.Time` gives `AsTime()`. An inline object generates a type and uses its name, such as `AsPaymentSourceVariant()`. Inline variants with the same Go type share one accessor, so `date` and `date-time` together give a single `AsTime()`. If an inline variant's name clashes with a different type in the union, the inline one takes a numeric suffix (`AsString2()`).
+
 ## SSE/Streaming Support
 
 Both client and server support Server-Sent Events:

@@ -3,6 +3,7 @@ package golang
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/kolah/eugene/v2/internal/config"
@@ -469,7 +470,17 @@ func (r *TypeResolver) resolveUnion(s *model.Schema, parentName, fieldName strin
 	}
 	r.seen[nestedName] = true
 
+	// Ref variants keep their type name, so reserve those before naming inline ones
+	usedNames := make(map[string]bool, len(schemas))
+	for _, variant := range schemas {
+		if variant.Ref != "" {
+			usedNames[refToTypeName(variant.Ref)] = true
+		}
+	}
+
 	var variants []UnionVariant
+	inlineGoTypes := make(map[string]bool, len(schemas))
+	inlineTypes := 0
 	for _, variant := range schemas {
 		var v UnionVariant
 		if variant.Ref != "" {
@@ -477,8 +488,20 @@ func (r *TypeResolver) resolveUnion(s *model.Schema, parentName, fieldName strin
 			v.Name = v.TypeName
 		} else {
 			// Inline schema in union - resolve it
-			v.TypeName = r.ResolveType(variant, nestedName, "Variant")
-			v.Name = v.TypeName
+			fieldName := "Variant"
+			if inlineTypes > 0 {
+				fieldName += strconv.Itoa(inlineTypes + 1)
+			}
+			v.TypeName = r.ResolveType(variant, nestedName, fieldName)
+			if strings.Contains(v.TypeName, nestedName+fieldName) {
+				inlineTypes++
+			}
+			// Same Go type decodes identically, so one accessor covers them all
+			if inlineGoTypes[v.TypeName] {
+				continue
+			}
+			inlineGoTypes[v.TypeName] = true
+			v.Name = uniqueVariantName(variantName(v.TypeName), usedNames)
 		}
 		v.Schema = variant
 
@@ -504,6 +527,30 @@ func (r *TypeResolver) resolveUnion(s *model.Schema, parentName, fieldName strin
 	})
 
 	return nestedName
+}
+
+// variantName derives an exported identifier from a Go type expression.
+func variantName(goType string) string {
+	if elem, ok := strings.CutPrefix(goType, "[]"); ok {
+		return variantName(elem) + "List"
+	}
+	if value, ok := strings.CutPrefix(goType, "map[string]"); ok {
+		return variantName(value) + "Map"
+	}
+	if _, typeName, ok := strings.Cut(goType, "."); ok {
+		return PascalCase(typeName)
+	}
+	return PascalCase(goType)
+}
+
+// uniqueVariantName reserves name in used, adding a numeric suffix if it is taken.
+func uniqueVariantName(name string, used map[string]bool) string {
+	unique := name
+	for i := 2; used[unique]; i++ {
+		unique = name + strconv.Itoa(i)
+	}
+	used[unique] = true
+	return unique
 }
 
 func (r *TypeResolver) resolveAllOf(s *model.Schema, parentName, fieldName string) string {

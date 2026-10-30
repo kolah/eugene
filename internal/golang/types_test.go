@@ -187,6 +187,96 @@ func TestTypeResolver_Union(t *testing.T) {
 	require.Len(t, nested[0].Variants, 2)
 }
 
+func TestTypeResolver_UnionInlineVariantNames(t *testing.T) {
+	object := func(prop string) *model.Schema {
+		return &model.Schema{
+			Type:       model.TypeObject,
+			Properties: []model.Property{{Name: prop, Schema: &model.Schema{Type: model.TypeString}}},
+		}
+	}
+
+	r := NewTypeResolver(&config.TypesConfig{})
+	r.ResolveType(&model.Schema{
+		AnyOf: []*model.Schema{
+			{Type: model.TypeString},
+			{Type: model.TypeInteger, Format: "int64"},
+			{Type: model.TypeString, Format: "date-time"},
+			{Type: model.TypeString, Format: "date"},
+			{Type: model.TypeArray, Items: &model.Schema{Type: model.TypeString}},
+			{Type: model.TypeArray, Items: &model.Schema{Type: model.TypeArray, Items: &model.Schema{Type: model.TypeString}}},
+			{Type: model.TypeObject, AdditionalProperties: &model.Schema{Type: model.TypeString}},
+			{Type: model.TypeObject},
+			object("a"),
+			object("b"),
+			{Ref: "#/components/schemas/List"},
+		},
+	}, "Pet", "Value")
+
+	var union ResolvedType
+	for _, n := range r.NestedTypes() {
+		if n.IsUnion {
+			union = n
+		}
+	}
+
+	type variant struct{ Name, TypeName string }
+	var got []variant
+	for _, v := range union.Variants {
+		got = append(got, variant{v.Name, v.TypeName})
+	}
+	require.Equal(t, []variant{
+		{"String", "string"},
+		{"Int64", "int64"},
+		{"Time", "time.Time"},
+		{"StringList", "[]string"},
+		{"StringListList", "[][]string"},
+		{"StringMap", "map[string]string"},
+		{"AnyMap", "map[string]any"},
+		{"PetValueVariant", "PetValueVariant"},
+		{"PetValueVariant2", "PetValueVariant2"},
+		{"List", "List"},
+	}, got)
+
+	nested := map[string]*model.Schema{}
+	for _, n := range r.NestedTypes() {
+		nested[n.Name] = n.Schema
+	}
+	require.Equal(t, "a", nested["PetValueVariant"].Properties[0].Name)
+	require.Equal(t, "b", nested["PetValueVariant2"].Properties[0].Name)
+}
+
+func TestTypeResolver_UnionInlineVariantsOfSameTypeShareAccessor(t *testing.T) {
+	r := NewTypeResolver(&config.TypesConfig{})
+	r.ResolveType(&model.Schema{
+		AnyOf: []*model.Schema{
+			{Type: model.TypeString},
+			{Type: model.TypeString, Format: "uri"},
+			{Type: model.TypeString, Format: "date-time"},
+			{Type: model.TypeString, Format: "date"},
+		},
+	}, "Pet", "Value")
+
+	variants := r.NestedTypes()[0].Variants
+	require.Len(t, variants, 2)
+	require.Equal(t, "String", variants[0].Name)
+	require.Equal(t, "Time", variants[1].Name)
+}
+
+func TestTypeResolver_UnionRefKeepsNameOverInlineVariant(t *testing.T) {
+	r := NewTypeResolver(&config.TypesConfig{})
+	r.ResolveType(&model.Schema{
+		OneOf: []*model.Schema{
+			{Type: model.TypeString},
+			{Ref: "#/components/schemas/String"},
+		},
+	}, "Pet", "Value")
+
+	variants := r.NestedTypes()[0].Variants
+	require.Equal(t, "String2", variants[0].Name)
+	require.Equal(t, "string", variants[0].TypeName)
+	require.Equal(t, "String", variants[1].Name)
+}
+
 func TestTypeResolver_AllOf(t *testing.T) {
 	r := NewTypeResolver(&config.TypesConfig{})
 

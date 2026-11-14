@@ -101,7 +101,7 @@ func splitWords(s string) []string {
 	var current strings.Builder
 
 	for i, r := range runes {
-		if r == '_' || r == '-' || r == ' ' || r == '.' {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
 			if current.Len() > 0 {
 				words = append(words, current.String())
 				current.Reset()

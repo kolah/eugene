@@ -37,6 +37,9 @@ func TestPascalCase(t *testing.T) {
 		{"UIContainer", "UIContainer"},
 		{"UINodeType", "UINodeType"},
 		{"HTMLParser", "HTMLParser"},
+		{"@type", "Type"},
+		{"a/b+c", "ABC"},
+		{"x(); evil() }; func y", "XEvilFuncY"},
 	}
 
 	for _, tt := range tests {

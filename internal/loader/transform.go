@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/kolah/eugene/v2/internal/model"
@@ -63,6 +64,9 @@ func Transform(result *Result) (*model.Spec, error) {
 		}
 	}
 
+	if err := validate(spec); err != nil {
+		return nil, fmt.Errorf("invalid spec: %w", err)
+	}
 	return spec, nil
 }
 

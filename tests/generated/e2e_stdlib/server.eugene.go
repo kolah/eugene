@@ -36,6 +36,11 @@ type GetDayHeaderParams struct {
 	XUntil *string
 }
 
+type GetWhoamiHeaderParams struct {
+	XUserID   string
+	XTenantID int
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(w http.ResponseWriter, r *http.Request)
@@ -53,6 +58,8 @@ type ServerInterface interface {
 	DeleteResource(w http.ResponseWriter, r *http.Request, id string)
 	// GetSession
 	GetSession(w http.ResponseWriter, r *http.Request)
+	// GetWhoami
+	GetWhoami(w http.ResponseWriter, r *http.Request, headers GetWhoamiHeaderParams)
 	// GetSecureData
 	GetSecureData(w http.ResponseWriter, r *http.Request)
 	// CreateShape
@@ -149,6 +156,30 @@ func (w *ServerInterfaceWrapper) GetSession(rw http.ResponseWriter, r *http.Requ
 	w.Handler.GetSession(rw, r)
 }
 
+func (w *ServerInterfaceWrapper) GetWhoami(rw http.ResponseWriter, r *http.Request) {
+	var headers GetWhoamiHeaderParams
+	if r.Header.Get("X-User-ID") == "" {
+		http.Error(rw, "missing X-User-ID", http.StatusBadRequest)
+		return
+	}
+	if v := r.Header.Get("X-User-ID"); v != "" {
+		headers.XUserID = v
+	}
+	if r.Header.Get("X-Tenant-ID") == "" {
+		http.Error(rw, "missing X-Tenant-ID", http.StatusBadRequest)
+		return
+	}
+	if v := r.Header.Get("X-Tenant-ID"); v != "" {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			http.Error(rw, "invalid X-Tenant-ID", http.StatusBadRequest)
+			return
+		} else {
+			headers.XTenantID = parsed
+		}
+	}
+	w.Handler.GetWhoami(rw, r, headers)
+}
+
 func (w *ServerInterfaceWrapper) GetSecureData(rw http.ResponseWriter, r *http.Request) {
 	w.Handler.GetSecureData(rw, r)
 }
@@ -178,6 +209,7 @@ func HandlerWithOptions(si ServerInterface, options StdlibServerOptions) http.Ha
 	mux.HandleFunc("POST "+options.BaseURL+"/resources", wrapper.CreateResource)
 	mux.HandleFunc("DELETE "+options.BaseURL+"/resources/{id}", wrapper.DeleteResource)
 	mux.HandleFunc("GET "+options.BaseURL+"/session", wrapper.GetSession)
+	mux.HandleFunc("GET "+options.BaseURL+"/whoami", wrapper.GetWhoami)
 	mux.HandleFunc("GET "+options.BaseURL+"/secure/data", wrapper.GetSecureData)
 	mux.HandleFunc("POST "+options.BaseURL+"/shapes", wrapper.CreateShape)
 

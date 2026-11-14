@@ -50,6 +50,11 @@ type Resource struct {
 	Description *string `json:"description,omitempty"`
 }
 
+type Whoami struct {
+	UserID   *string `json:"userId,omitempty"`
+	TenantID *int    `json:"tenantId,omitempty"`
+}
+
 type SessionInfo struct {
 	SessionID *string `json:"sessionId,omitempty"`
 	UserID    *string `json:"userId,omitempty"`

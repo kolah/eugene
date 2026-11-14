@@ -37,6 +37,11 @@ type GetDayHeaderParams struct {
 	XUntil *string `header:"X-Until"`
 }
 
+type GetWhoamiHeaderParams struct {
+	XUserID   string `header:"X-User-ID"`
+	XTenantID int    `header:"X-Tenant-ID"`
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(ctx echo.Context) error
@@ -54,6 +59,8 @@ type ServerInterface interface {
 	DeleteResource(ctx echo.Context, id string) error
 	// GetSession
 	GetSession(ctx echo.Context) error
+	// GetWhoami
+	GetWhoami(ctx echo.Context, headers GetWhoamiHeaderParams) error
 	// GetSecureData
 	GetSecureData(ctx echo.Context) error
 	// CreateShape
@@ -130,6 +137,20 @@ func (w *ServerInterfaceWrapper) GetSession(ctx echo.Context) error {
 	return w.Handler.GetSession(ctx)
 }
 
+func (w *ServerInterfaceWrapper) GetWhoami(ctx echo.Context) error {
+	if ctx.Request().Header.Get("X-User-ID") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-User-ID")
+	}
+	if ctx.Request().Header.Get("X-Tenant-ID") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tenant-ID")
+	}
+	var headers GetWhoamiHeaderParams
+	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	}
+	return w.Handler.GetWhoami(ctx, headers)
+}
+
 func (w *ServerInterfaceWrapper) GetSecureData(ctx echo.Context) error {
 	return w.Handler.GetSecureData(ctx)
 }
@@ -149,6 +170,7 @@ func RegisterHandlers(router Router, si ServerInterface) {
 	router.POST("/resources", wrapper.CreateResource)
 	router.DELETE("/resources/:id", wrapper.DeleteResource)
 	router.GET("/session", wrapper.GetSession)
+	router.GET("/whoami", wrapper.GetWhoami)
 	router.GET("/secure/data", wrapper.GetSecureData)
 	router.POST("/shapes", wrapper.CreateShape)
 }
@@ -164,6 +186,7 @@ func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL stri
 	router.POST(baseURL+"/resources", wrapper.CreateResource)
 	router.DELETE(baseURL+"/resources/:id", wrapper.DeleteResource)
 	router.GET(baseURL+"/session", wrapper.GetSession)
+	router.GET(baseURL+"/whoami", wrapper.GetWhoami)
 	router.GET(baseURL+"/secure/data", wrapper.GetSecureData)
 	router.POST(baseURL+"/shapes", wrapper.CreateShape)
 }

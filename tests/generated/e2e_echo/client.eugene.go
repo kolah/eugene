@@ -163,6 +163,13 @@ type GetSessionResponse struct {
 	Raw        *http.Response
 }
 
+// GetWhoamiResponse contains typed response data for GetWhoami.
+type GetWhoamiResponse struct {
+	StatusCode int
+	JSON200    *Whoami
+	Raw        *http.Response
+}
+
 // GetSecureDataResponse contains typed response data for GetSecureData.
 type GetSecureDataResponse struct {
 	StatusCode int
@@ -633,6 +640,57 @@ func (c *Client) GetSession(ctx context.Context) (*GetSessionResponse, error) {
 	return result, nil
 }
 
+func (c *Client) GetWhoami(ctx context.Context, params *GetWhoamiParams) (*GetWhoamiResponse, error) {
+	path := "/whoami"
+
+	var bodyReader io.Reader
+
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+path, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	if params != nil {
+		httpReq.Header.Set("X-User-ID", fmt.Sprint(params.XUserID))
+	}
+	if params != nil {
+		httpReq.Header.Set("X-Tenant-ID", fmt.Sprint(params.XTenantID))
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	result := &GetWhoamiResponse{
+		StatusCode: resp.StatusCode,
+		Raw:        resp,
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return result, fmt.Errorf("reading response: %w", err)
+	}
+
+	switch resp.StatusCode {
+	case 200:
+		var body Whoami
+		if len(bodyBytes) > 0 {
+			if err := json.Unmarshal(bodyBytes, &body); err != nil {
+				return result, fmt.Errorf("decoding response: %w", err)
+			}
+		}
+		result.JSON200 = &body
+	}
+
+	if resp.StatusCode >= 400 {
+		return result, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return result, nil
+}
+
 func (c *Client) GetSecureData(ctx context.Context) (*GetSecureDataResponse, error) {
 	path := "/secure/data"
 
@@ -751,4 +809,9 @@ type GetItemParams struct {
 type GetDayParams struct {
 	Since  *string
 	XUntil *string
+}
+
+type GetWhoamiParams struct {
+	XUserID   string
+	XTenantID int
 }

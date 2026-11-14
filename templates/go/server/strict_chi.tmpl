@@ -134,6 +134,12 @@ func (h *StrictChiHandler) {{ .ID }}(w http.ResponseWriter, r *http.Request) {
 {{- end }}
 {{- end }}
 {{- range .HeaderParams }}
+{{- if .Required }}
+	if r.Header.Get("{{ .Name }}") == "" {
+		http.Error(w, "missing {{ .Name }}", http.StatusBadRequest)
+		return
+	}
+{{- end }}
 {{- if hasPrefix .Type "[]" }}
 	if values := r.Header.Values("{{ .Name }}"); len(values) > 0 {
 		{{ if .Required }}request.{{ .GoName }} = values{{ else }}request.{{ .GoName }} = &values{{ end }}

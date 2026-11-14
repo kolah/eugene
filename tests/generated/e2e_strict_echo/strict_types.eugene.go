@@ -48,6 +48,12 @@ type DeleteResourceRequestObject struct {
 	ID string // path parameter
 }
 
+// GetWhoamiRequestObject represents the request for GetWhoami.
+type GetWhoamiRequestObject struct {
+	XUserID   string // header parameter
+	XTenantID int    // header parameter
+}
+
 // CreateShapeRequestObject represents the request for CreateShape.
 type CreateShapeRequestObject struct {
 	Body Shape
@@ -173,6 +179,20 @@ func (r GetSession200JSONResponse) VisitGetSessionResponseObject(w http.Response
 	return json.NewEncoder(w).Encode(r)
 }
 
+// GetWhoamiResponseObject is the interface for GetWhoami responses.
+type GetWhoamiResponseObject interface {
+	VisitGetWhoamiResponseObject(w http.ResponseWriter) error
+}
+
+// GetWhoami200JSONResponse is the response for GetWhoami with status 200.
+type GetWhoami200JSONResponse Whoami
+
+func (r GetWhoami200JSONResponse) VisitGetWhoamiResponseObject(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	return json.NewEncoder(w).Encode(r)
+}
+
 // GetSecureDataResponseObject is the interface for GetSecureData responses.
 type GetSecureDataResponseObject interface {
 	VisitGetSecureDataResponseObject(w http.ResponseWriter) error
@@ -228,6 +248,8 @@ type StrictServerInterface interface {
 	DeleteResource(ctx context.Context, request DeleteResourceRequestObject) (DeleteResourceResponseObject, error)
 	// GetSession
 	GetSession(ctx context.Context) (GetSessionResponseObject, error)
+	// GetWhoami
+	GetWhoami(ctx context.Context, request GetWhoamiRequestObject) (GetWhoamiResponseObject, error)
 	// GetSecureData
 	GetSecureData(ctx context.Context) (GetSecureDataResponseObject, error)
 	// CreateShape

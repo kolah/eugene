@@ -169,6 +169,13 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 {{- end }}
 {{- end }}
 {{- if .HasHeaderParams }}
+{{- range .HeaderParams }}
+{{- if .Required }}
+	if ctx.Request().Header.Get("{{ .Name }}") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing {{ .Name }}")
+	}
+{{- end }}
+{{- end }}
 	var headers {{ .ID | pascalCase }}HeaderParams
 	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")

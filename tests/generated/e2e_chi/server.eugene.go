@@ -38,6 +38,11 @@ type GetDayHeaderParams struct {
 	XUntil *string
 }
 
+type GetWhoamiHeaderParams struct {
+	XUserID   string
+	XTenantID int
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(w http.ResponseWriter, r *http.Request)
@@ -55,6 +60,8 @@ type ServerInterface interface {
 	DeleteResource(w http.ResponseWriter, r *http.Request, id string)
 	// GetSession
 	GetSession(w http.ResponseWriter, r *http.Request)
+	// GetWhoami
+	GetWhoami(w http.ResponseWriter, r *http.Request, headers GetWhoamiHeaderParams)
 	// GetSecureData
 	GetSecureData(w http.ResponseWriter, r *http.Request)
 	// CreateShape
@@ -151,6 +158,30 @@ func (w *ServerInterfaceWrapper) GetSession(rw http.ResponseWriter, r *http.Requ
 	w.Handler.GetSession(rw, r)
 }
 
+func (w *ServerInterfaceWrapper) GetWhoami(rw http.ResponseWriter, r *http.Request) {
+	var headers GetWhoamiHeaderParams
+	if r.Header.Get("X-User-ID") == "" {
+		http.Error(rw, "missing X-User-ID", http.StatusBadRequest)
+		return
+	}
+	if v := r.Header.Get("X-User-ID"); v != "" {
+		headers.XUserID = v
+	}
+	if r.Header.Get("X-Tenant-ID") == "" {
+		http.Error(rw, "missing X-Tenant-ID", http.StatusBadRequest)
+		return
+	}
+	if v := r.Header.Get("X-Tenant-ID"); v != "" {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			http.Error(rw, "invalid X-Tenant-ID", http.StatusBadRequest)
+			return
+		} else {
+			headers.XTenantID = parsed
+		}
+	}
+	w.Handler.GetWhoami(rw, r, headers)
+}
+
 func (w *ServerInterfaceWrapper) GetSecureData(rw http.ResponseWriter, r *http.Request) {
 	w.Handler.GetSecureData(rw, r)
 }
@@ -185,6 +216,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Method("POST", options.BaseURL+"/resources", http.HandlerFunc(wrapper.CreateResource))
 	r.Method("DELETE", options.BaseURL+"/resources/{id}", http.HandlerFunc(wrapper.DeleteResource))
 	r.Method("GET", options.BaseURL+"/session", http.HandlerFunc(wrapper.GetSession))
+	r.Method("GET", options.BaseURL+"/whoami", http.HandlerFunc(wrapper.GetWhoami))
 	r.Method("GET", options.BaseURL+"/secure/data", http.HandlerFunc(wrapper.GetSecureData))
 	r.Method("POST", options.BaseURL+"/shapes", http.HandlerFunc(wrapper.CreateShape))
 

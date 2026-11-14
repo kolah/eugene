@@ -162,6 +162,34 @@ func (h *StrictEchoHandler) GetSession(ctx echo.Context) error {
 	return response.VisitGetSessionResponseObject(ctx.Response().Writer)
 }
 
+// GetWhoami handles GET /whoami
+func (h *StrictEchoHandler) GetWhoami(ctx echo.Context) error {
+	var request GetWhoamiRequestObject
+	if ctx.Request().Header.Get("X-User-ID") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-User-ID")
+	}
+	if v := ctx.Request().Header.Get("X-User-ID"); v != "" {
+		request.XUserID = v
+	}
+	if ctx.Request().Header.Get("X-Tenant-ID") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tenant-ID")
+	}
+	if v := ctx.Request().Header.Get("X-Tenant-ID"); v != "" {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Tenant-ID")
+		} else {
+			request.XTenantID = parsed
+		}
+	}
+
+	response, err := h.ssi.GetWhoami(ctx.Request().Context(), request)
+	if err != nil {
+		return err
+	}
+
+	return response.VisitGetWhoamiResponseObject(ctx.Response().Writer)
+}
+
 // GetSecureData handles GET /secure/data
 func (h *StrictEchoHandler) GetSecureData(ctx echo.Context) error {
 
@@ -202,6 +230,7 @@ func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	router.POST("/resources", h.CreateResource)
 	router.DELETE("/resources/:id", h.DeleteResource)
 	router.GET("/session", h.GetSession)
+	router.GET("/whoami", h.GetWhoami)
 	router.GET("/secure/data", h.GetSecureData)
 	router.POST("/shapes", h.CreateShape)
 }
@@ -218,6 +247,7 @@ func RegisterStrictHandlersWithBaseURL(router Router, ssi StrictServerInterface,
 	router.POST(baseURL+"/resources", h.CreateResource)
 	router.DELETE(baseURL+"/resources/:id", h.DeleteResource)
 	router.GET(baseURL+"/session", h.GetSession)
+	router.GET(baseURL+"/whoami", h.GetWhoami)
 	router.GET(baseURL+"/secure/data", h.GetSecureData)
 	router.POST(baseURL+"/shapes", h.CreateShape)
 }

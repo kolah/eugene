@@ -119,6 +119,10 @@ func (h *BasicEchoHandler) GetSession(ctx echo.Context) error {
 	})
 }
 
+func (h *BasicEchoHandler) GetWhoami(ctx echo.Context, headers basic.GetWhoamiHeaderParams) error {
+	return ctx.JSON(http.StatusOK, basic.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID})
+}
+
 func (h *BasicEchoHandler) GetSecureData(ctx echo.Context) error {
 	apiKey := ctx.Request().Header.Get("X-API-Key")
 	if apiKey != "valid-api-key" {
@@ -201,6 +205,10 @@ func (h *StrictEchoHandler) GetSession(ctx context.Context) (strict.GetSessionRe
 		UserID:    &userID,
 		ExpiresAt: &expiresAt,
 	}, nil
+}
+
+func (h *StrictEchoHandler) GetWhoami(ctx context.Context, req strict.GetWhoamiRequestObject) (strict.GetWhoamiResponseObject, error) {
+	return strict.GetWhoami200JSONResponse{UserID: &req.XUserID, TenantID: &req.XTenantID}, nil
 }
 
 func (h *StrictEchoHandler) GetSecureData(ctx context.Context) (strict.GetSecureDataResponseObject, error) {
@@ -327,6 +335,11 @@ func (h *ChiHandler) GetSession(w http.ResponseWriter, r *http.Request) {
 		UserID:    &userID,
 		ExpiresAt: &expiresAt,
 	})
+}
+
+func (h *ChiHandler) GetWhoami(w http.ResponseWriter, r *http.Request, headers chiGen.GetWhoamiHeaderParams) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(chiGen.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID})
 }
 
 func (h *ChiHandler) GetSecureData(w http.ResponseWriter, r *http.Request) {
@@ -472,6 +485,11 @@ func (h *StdlibHandler) GetSession(w http.ResponseWriter, r *http.Request) {
 		UserID:    &userID,
 		ExpiresAt: &expiresAt,
 	})
+}
+
+func (h *StdlibHandler) GetWhoami(w http.ResponseWriter, r *http.Request, headers stdlibGen.GetWhoamiHeaderParams) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stdlibGen.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID})
 }
 
 func (h *StdlibHandler) GetSecureData(w http.ResponseWriter, r *http.Request) {
@@ -703,6 +721,71 @@ func TestE2EHeaderParams(t *testing.T) {
 		assert.Contains(t, string(body), `"id":"header-test"`)
 		assert.Contains(t, string(body), `"filter":"test"`)
 		assert.Contains(t, string(body), `"requestId":"req-12345"`)
+	})
+}
+
+func TestE2ERequiredHeaderParams(t *testing.T) {
+	echoServer := echo.New()
+	basic.RegisterHandlers(echoServer, &BasicEchoHandler{})
+	strictServer := echo.New()
+	strict.RegisterStrictHandlers(strictServer, &StrictEchoHandler{})
+
+	servers := map[string]http.Handler{
+		"echo":        echoServer,
+		"strict echo": strictServer,
+		"chi":         chiGen.Handler(&ChiHandler{}),
+		"stdlib":      stdlibGen.Handler(&StdlibHandler{}),
+	}
+	for name, handler := range servers {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			get := func(t *testing.T, headers map[string]string) (int, string) {
+				req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL+"/whoami", nil)
+				require.NoError(t, err)
+				for k, v := range headers {
+					req.Header.Set(k, v)
+				}
+				resp, err := http.DefaultClient.Do(req)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				return resp.StatusCode, string(body)
+			}
+
+			t.Run("required headers arrive", func(t *testing.T) {
+				status, body := get(t, map[string]string{"X-User-ID": "user-1", "X-Tenant-ID": "7"})
+				assert.Equal(t, http.StatusOK, status)
+				assert.JSONEq(t, `{"userId":"user-1","tenantId":7}`, body)
+			})
+
+			t.Run("missing required string header returns 400", func(t *testing.T) {
+				status, body := get(t, map[string]string{"X-Tenant-ID": "7"})
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Contains(t, body, "missing X-User-ID")
+			})
+
+			t.Run("missing required integer header returns 400", func(t *testing.T) {
+				status, body := get(t, map[string]string{"X-User-ID": "user-1"})
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Contains(t, body, "missing X-Tenant-ID")
+			})
+		})
+	}
+
+	t.Run("client sends required headers", func(t *testing.T) {
+		server := httptest.NewServer(strictServer)
+		defer server.Close()
+		resp, err := strict.NewClient(server.URL).GetWhoami(context.Background(), &strict.GetWhoamiParams{
+			XUserID:   "user-2",
+			XTenantID: 9,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp.JSON200)
+		assert.Equal(t, "user-2", *resp.JSON200.UserID)
+		assert.Equal(t, 9, *resp.JSON200.TenantID)
 	})
 }
 

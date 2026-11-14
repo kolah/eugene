@@ -205,6 +205,15 @@ paths:
           required: true
           schema:
             type: integer
+        - name: X-Status
+          in: header
+          schema:
+            $ref: "#/components/schemas/Status"
+        - name: X-Since
+          in: header
+          schema:
+            type: string
+            format: date-time
       responses:
         "200":
           description: The caller
@@ -352,6 +361,11 @@ components:
           type: string
         tenantId:
           type: integer
+        status:
+          $ref: "#/components/schemas/Status"
+        since:
+          type: string
+          format: date-time
 
     SessionInfo:
       type: object

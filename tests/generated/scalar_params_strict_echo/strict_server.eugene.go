@@ -23,6 +23,86 @@ func NewStrictHandler(ssi StrictServerInterface) *StrictEchoHandler {
 // GetPrefs handles GET /prefs
 func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 	var request GetPrefsRequestObject
+	if v := ctx.Request().Header.Get("X-Sid"); v != "" {
+		request.XSid = v
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Sid")
+	}
+	if v := ctx.Request().Header.Get("X-Count"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Count")
+		}
+		request.XCount = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Count32"); v != "" {
+		parsed64, err := strconv.ParseInt(v, 10, 32)
+		parsed := int32(parsed64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Count32")
+		}
+		request.XCount32 = parsed
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Count32")
+	}
+	if v := ctx.Request().Header.Get("X-Count64"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Count64")
+		}
+		request.XCount64 = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Ratio"); v != "" {
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Ratio")
+		}
+		request.XRatio = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Beta"); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Beta")
+		}
+		request.XBeta = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Device"); v != "" {
+		parsed, err := uuid.Parse(v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Device")
+		}
+		request.XDevice = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Since")
+		}
+		request.XSince = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Theme"); v != "" {
+		typed := Theme(v)
+		if !typed.IsValid() {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Theme")
+		}
+		request.XTheme = &typed
+	}
+	if v := ctx.Request().Header.Get("X-Mode"); v != "" {
+		typed := XMode(v)
+		if !typed.IsValid() {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Mode")
+		}
+		request.XMode = &typed
+	}
+	if v := ctx.Request().Header.Get("X-Token"); v != "" {
+		typed := Token(v)
+		request.XToken = &typed
+	}
+	if values := ctx.Request().Header.Values("X-Tags"); len(values) > 0 {
+		request.XTags = values
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tags")
+	}
 	if c, err := ctx.Cookie("sid"); err == nil {
 		request.Sid = c.Value
 	} else {
@@ -88,7 +168,7 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		request.Theme = &typed
 	}
 	if c, err := ctx.Cookie("mode"); err == nil {
-		typed := Mode(c.Value)
+		typed := XMode(c.Value)
 		if !typed.IsValid() {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid mode")
 		}

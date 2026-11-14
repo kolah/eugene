@@ -230,6 +230,42 @@ func (c *Client) GetPrefs(ctx context.Context, params *GetPrefsParams) (*GetPref
 	}
 	httpReq.Header.Set("Accept", "application/json")
 	if params != nil {
+		httpReq.Header.Set("X-Sid", fmt.Sprint(params.XSid))
+	}
+	if params != nil && params.XCount != nil {
+		httpReq.Header.Set("X-Count", fmt.Sprint(*params.XCount))
+	}
+	if params != nil {
+		httpReq.Header.Set("X-Count32", fmt.Sprint(params.XCount32))
+	}
+	if params != nil && params.XCount64 != nil {
+		httpReq.Header.Set("X-Count64", fmt.Sprint(*params.XCount64))
+	}
+	if params != nil && params.XRatio != nil {
+		httpReq.Header.Set("X-Ratio", fmt.Sprint(*params.XRatio))
+	}
+	if params != nil && params.XBeta != nil {
+		httpReq.Header.Set("X-Beta", fmt.Sprint(*params.XBeta))
+	}
+	if params != nil && params.XDevice != nil {
+		httpReq.Header.Set("X-Device", fmt.Sprint(*params.XDevice))
+	}
+	if params != nil && params.XSince != nil {
+		httpReq.Header.Set("X-Since", fmt.Sprint(*params.XSince))
+	}
+	if params != nil && params.XTheme != nil {
+		httpReq.Header.Set("X-Theme", fmt.Sprint(*params.XTheme))
+	}
+	if params != nil && params.XMode != nil {
+		httpReq.Header.Set("X-Mode", fmt.Sprint(*params.XMode))
+	}
+	if params != nil && params.XToken != nil {
+		httpReq.Header.Set("X-Token", fmt.Sprint(*params.XToken))
+	}
+	if params != nil {
+		httpReq.Header.Set("X-Tags", fmt.Sprint(params.XTags))
+	}
+	if params != nil {
 		httpReq.AddCookie(&http.Cookie{Name: "sid", Value: fmt.Sprint(params.Sid)})
 	}
 	if params != nil && params.Count != nil {
@@ -307,17 +343,29 @@ func (c *Client) StreamEvents(ctx context.Context, params *StreamEventsParams) (
 }
 
 type GetPrefsParams struct {
-	Sid     string
-	Count   *int
-	Count32 int32
-	Count64 *int64
-	Ratio   *float64
-	Beta    *bool
-	Device  *string
-	Since   *string
-	Theme   *Theme
-	Mode    *string
-	Token   *Token
+	XSid     string
+	XCount   *int
+	XCount32 int32
+	XCount64 *int64
+	XRatio   *float64
+	XBeta    *bool
+	XDevice  *string
+	XSince   *string
+	XTheme   *Theme
+	XMode    *string
+	XToken   *Token
+	XTags    []string
+	Sid      string
+	Count    *int
+	Count32  int32
+	Count64  *int64
+	Ratio    *float64
+	Beta     *bool
+	Device   *string
+	Since    *string
+	Theme    *Theme
+	Mode     *string
+	Token    *Token
 }
 
 type StreamEventsParams struct {

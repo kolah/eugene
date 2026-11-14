@@ -11,14 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type Mode string
+type XMode string
 
 const (
-	ModeCompact Mode = "compact"
-	ModeWide    Mode = "wide"
+	XModeCompact XMode = "compact"
+	XModeWide    XMode = "wide"
 )
 
-func (e Mode) IsValid() bool {
+func (e XMode) IsValid() bool {
 	switch e {
 	case "compact":
 		return true
@@ -71,6 +71,21 @@ func (w *Writer) SendRaw(eventType string, data []byte) error {
 	return nil
 }
 
+type GetPrefsHeaderParams struct {
+	XSid     string
+	XCount   *int
+	XCount32 int32
+	XCount64 *int64
+	XRatio   *float64
+	XBeta    *bool
+	XDevice  *uuid.UUID
+	XSince   *time.Time
+	XTheme   *Theme
+	XMode    *XMode
+	XToken   *Token
+	XTags    []string
+}
+
 type GetPrefsCookieParams struct {
 	Sid     string
 	Count   *int
@@ -81,7 +96,7 @@ type GetPrefsCookieParams struct {
 	Device  *uuid.UUID
 	Since   *time.Time
 	Theme   *Theme
-	Mode    *Mode
+	Mode    *XMode
 	Token   *Token
 }
 
@@ -92,7 +107,7 @@ type StreamEventsCookieParams struct {
 
 type ServerInterface interface {
 	// GetPrefs
-	GetPrefs(w http.ResponseWriter, r *http.Request, cookies GetPrefsCookieParams)
+	GetPrefs(w http.ResponseWriter, r *http.Request, headers GetPrefsHeaderParams, cookies GetPrefsCookieParams)
 	// StreamEvents (streaming)
 	StreamEvents(w http.ResponseWriter, r *http.Request, cookies StreamEventsCookieParams)
 }
@@ -102,6 +117,99 @@ type ServerInterfaceWrapper struct {
 }
 
 func (w *ServerInterfaceWrapper) GetPrefs(rw http.ResponseWriter, r *http.Request) {
+	var headers GetPrefsHeaderParams
+	if v := r.Header.Get("X-Sid"); v != "" {
+		headers.XSid = v
+	} else {
+		http.Error(rw, "missing X-Sid", http.StatusBadRequest)
+		return
+	}
+	if v := r.Header.Get("X-Count"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			http.Error(rw, "invalid X-Count", http.StatusBadRequest)
+			return
+		}
+		headers.XCount = &parsed
+	}
+	if v := r.Header.Get("X-Count32"); v != "" {
+		parsed64, err := strconv.ParseInt(v, 10, 32)
+		parsed := int32(parsed64)
+		if err != nil {
+			http.Error(rw, "invalid X-Count32", http.StatusBadRequest)
+			return
+		}
+		headers.XCount32 = parsed
+	} else {
+		http.Error(rw, "missing X-Count32", http.StatusBadRequest)
+		return
+	}
+	if v := r.Header.Get("X-Count64"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			http.Error(rw, "invalid X-Count64", http.StatusBadRequest)
+			return
+		}
+		headers.XCount64 = &parsed
+	}
+	if v := r.Header.Get("X-Ratio"); v != "" {
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			http.Error(rw, "invalid X-Ratio", http.StatusBadRequest)
+			return
+		}
+		headers.XRatio = &parsed
+	}
+	if v := r.Header.Get("X-Beta"); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			http.Error(rw, "invalid X-Beta", http.StatusBadRequest)
+			return
+		}
+		headers.XBeta = &parsed
+	}
+	if v := r.Header.Get("X-Device"); v != "" {
+		parsed, err := uuid.Parse(v)
+		if err != nil {
+			http.Error(rw, "invalid X-Device", http.StatusBadRequest)
+			return
+		}
+		headers.XDevice = &parsed
+	}
+	if v := r.Header.Get("X-Since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(rw, "invalid X-Since", http.StatusBadRequest)
+			return
+		}
+		headers.XSince = &parsed
+	}
+	if v := r.Header.Get("X-Theme"); v != "" {
+		typed := Theme(v)
+		if !typed.IsValid() {
+			http.Error(rw, "invalid X-Theme", http.StatusBadRequest)
+			return
+		}
+		headers.XTheme = &typed
+	}
+	if v := r.Header.Get("X-Mode"); v != "" {
+		typed := XMode(v)
+		if !typed.IsValid() {
+			http.Error(rw, "invalid X-Mode", http.StatusBadRequest)
+			return
+		}
+		headers.XMode = &typed
+	}
+	if v := r.Header.Get("X-Token"); v != "" {
+		typed := Token(v)
+		headers.XToken = &typed
+	}
+	if values := r.Header.Values("X-Tags"); len(values) > 0 {
+		headers.XTags = values
+	} else {
+		http.Error(rw, "missing X-Tags", http.StatusBadRequest)
+		return
+	}
 	var cookies GetPrefsCookieParams
 	if c, err := r.Cookie("sid"); err == nil {
 		cookies.Sid = c.Value
@@ -178,7 +286,7 @@ func (w *ServerInterfaceWrapper) GetPrefs(rw http.ResponseWriter, r *http.Reques
 		cookies.Theme = &typed
 	}
 	if c, err := r.Cookie("mode"); err == nil {
-		typed := Mode(c.Value)
+		typed := XMode(c.Value)
 		if !typed.IsValid() {
 			http.Error(rw, "invalid mode", http.StatusBadRequest)
 			return
@@ -189,7 +297,7 @@ func (w *ServerInterfaceWrapper) GetPrefs(rw http.ResponseWriter, r *http.Reques
 		typed := Token(c.Value)
 		cookies.Token = &typed
 	}
-	w.Handler.GetPrefs(rw, r, cookies)
+	w.Handler.GetPrefs(rw, r, headers, cookies)
 }
 
 func (w *ServerInterfaceWrapper) StreamEvents(rw http.ResponseWriter, r *http.Request) {

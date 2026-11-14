@@ -10,14 +10,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type Mode string
+type XMode string
 
 const (
-	ModeCompact Mode = "compact"
-	ModeWide    Mode = "wide"
+	XModeCompact XMode = "compact"
+	XModeWide    XMode = "wide"
 )
 
-func (e Mode) IsValid() bool {
+func (e XMode) IsValid() bool {
 	switch e {
 	case "compact":
 		return true
@@ -29,17 +29,29 @@ func (e Mode) IsValid() bool {
 
 // GetPrefsRequestObject represents the request for GetPrefs.
 type GetPrefsRequestObject struct {
-	Sid     string     // cookie parameter
-	Count   *int       // cookie parameter
-	Count32 int32      // cookie parameter
-	Count64 *int64     // cookie parameter
-	Ratio   *float64   // cookie parameter
-	Beta    *bool      // cookie parameter
-	Device  *uuid.UUID // cookie parameter
-	Since   *time.Time // cookie parameter
-	Theme   *Theme     // cookie parameter
-	Mode    *Mode      // cookie parameter
-	Token   *Token     // cookie parameter
+	XSid     string     // header parameter
+	XCount   *int       // header parameter
+	XCount32 int32      // header parameter
+	XCount64 *int64     // header parameter
+	XRatio   *float64   // header parameter
+	XBeta    *bool      // header parameter
+	XDevice  *uuid.UUID // header parameter
+	XSince   *time.Time // header parameter
+	XTheme   *Theme     // header parameter
+	XMode    *XMode     // header parameter
+	XToken   *Token     // header parameter
+	XTags    []string   // header parameter
+	Sid      string     // cookie parameter
+	Count    *int       // cookie parameter
+	Count32  int32      // cookie parameter
+	Count64  *int64     // cookie parameter
+	Ratio    *float64   // cookie parameter
+	Beta     *bool      // cookie parameter
+	Device   *uuid.UUID // cookie parameter
+	Since    *time.Time // cookie parameter
+	Theme    *Theme     // cookie parameter
+	Mode     *XMode     // cookie parameter
+	Token    *Token     // cookie parameter
 }
 
 // StreamEventsRequestObject represents the request for StreamEvents.

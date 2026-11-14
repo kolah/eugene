@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type EchoFormFormRequest struct {
@@ -45,6 +46,8 @@ type GetSessionCookieParams struct {
 type GetWhoamiHeaderParams struct {
 	XUserID   string
 	XTenantID int
+	XStatus   *Status
+	XSince    *time.Time
 }
 
 type ServerInterface interface {
@@ -126,12 +129,12 @@ func (w *ServerInterfaceWrapper) GetItem(rw http.ResponseWriter, r *http.Request
 		headers.XRequestID = &v
 	}
 	if v := r.Header.Get("X-Retry-Count"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
 			http.Error(rw, "invalid X-Retry-Count", http.StatusBadRequest)
 			return
-		} else {
-			headers.XRetryCount = &parsed
 		}
+		headers.XRetryCount = &parsed
 	}
 	w.Handler.GetItem(rw, r, id, params, headers)
 }
@@ -187,24 +190,38 @@ func (w *ServerInterfaceWrapper) GetSession(rw http.ResponseWriter, r *http.Requ
 
 func (w *ServerInterfaceWrapper) GetWhoami(rw http.ResponseWriter, r *http.Request) {
 	var headers GetWhoamiHeaderParams
-	if r.Header.Get("X-User-ID") == "" {
+	if v := r.Header.Get("X-User-ID"); v != "" {
+		headers.XUserID = v
+	} else {
 		http.Error(rw, "missing X-User-ID", http.StatusBadRequest)
 		return
 	}
-	if v := r.Header.Get("X-User-ID"); v != "" {
-		headers.XUserID = v
-	}
-	if r.Header.Get("X-Tenant-ID") == "" {
+	if v := r.Header.Get("X-Tenant-ID"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			http.Error(rw, "invalid X-Tenant-ID", http.StatusBadRequest)
+			return
+		}
+		headers.XTenantID = parsed
+	} else {
 		http.Error(rw, "missing X-Tenant-ID", http.StatusBadRequest)
 		return
 	}
-	if v := r.Header.Get("X-Tenant-ID"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
-			http.Error(rw, "invalid X-Tenant-ID", http.StatusBadRequest)
+	if v := r.Header.Get("X-Status"); v != "" {
+		typed := Status(v)
+		if !typed.IsValid() {
+			http.Error(rw, "invalid X-Status", http.StatusBadRequest)
 			return
-		} else {
-			headers.XTenantID = parsed
 		}
+		headers.XStatus = &typed
+	}
+	if v := r.Header.Get("X-Since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(rw, "invalid X-Since", http.StatusBadRequest)
+			return
+		}
+		headers.XSince = &parsed
 	}
 	w.Handler.GetWhoami(rw, r, headers)
 }

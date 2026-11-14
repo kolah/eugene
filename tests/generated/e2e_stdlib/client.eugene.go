@@ -665,6 +665,12 @@ func (c *Client) GetWhoami(ctx context.Context, params *GetWhoamiParams) (*GetWh
 	if params != nil {
 		httpReq.Header.Set("X-Tenant-ID", fmt.Sprint(params.XTenantID))
 	}
+	if params != nil && params.XStatus != nil {
+		httpReq.Header.Set("X-Status", fmt.Sprint(*params.XStatus))
+	}
+	if params != nil && params.XSince != nil {
+		httpReq.Header.Set("X-Since", fmt.Sprint(*params.XSince))
+	}
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -829,4 +835,6 @@ type GetSessionParams struct {
 type GetWhoamiParams struct {
 	XUserID   string
 	XTenantID int
+	XStatus   *Status
+	XSince    *string
 }

@@ -111,7 +111,7 @@ func (h *BasicEchoHandler) GetSession(ctx echo.Context, cookies basic.GetSession
 }
 
 func (h *BasicEchoHandler) GetWhoami(ctx echo.Context, headers basic.GetWhoamiHeaderParams) error {
-	return ctx.JSON(http.StatusOK, basic.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID})
+	return ctx.JSON(http.StatusOK, basic.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID, Status: headers.XStatus, Since: headers.XSince})
 }
 
 func (h *BasicEchoHandler) GetSecureData(ctx echo.Context) error {
@@ -198,7 +198,7 @@ func (h *StrictEchoHandler) GetSession(ctx context.Context, req strict.GetSessio
 }
 
 func (h *StrictEchoHandler) GetWhoami(ctx context.Context, req strict.GetWhoamiRequestObject) (strict.GetWhoamiResponseObject, error) {
-	return strict.GetWhoami200JSONResponse{UserID: &req.XUserID, TenantID: &req.XTenantID}, nil
+	return strict.GetWhoami200JSONResponse{UserID: &req.XUserID, TenantID: &req.XTenantID, Status: req.XStatus, Since: req.XSince}, nil
 }
 
 func (h *StrictEchoHandler) GetSecureData(ctx context.Context) (strict.GetSecureDataResponseObject, error) {
@@ -317,7 +317,7 @@ func (h *ChiHandler) GetSession(w http.ResponseWriter, r *http.Request, cookies 
 
 func (h *ChiHandler) GetWhoami(w http.ResponseWriter, r *http.Request, headers chiGen.GetWhoamiHeaderParams) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(chiGen.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID})
+	json.NewEncoder(w).Encode(chiGen.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID, Status: headers.XStatus, Since: headers.XSince})
 }
 
 func (h *ChiHandler) GetSecureData(w http.ResponseWriter, r *http.Request) {
@@ -455,7 +455,7 @@ func (h *StdlibHandler) GetSession(w http.ResponseWriter, r *http.Request, cooki
 
 func (h *StdlibHandler) GetWhoami(w http.ResponseWriter, r *http.Request, headers stdlibGen.GetWhoamiHeaderParams) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stdlibGen.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID})
+	json.NewEncoder(w).Encode(stdlibGen.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID, Status: headers.XStatus, Since: headers.XSince})
 }
 
 func (h *StdlibHandler) GetSecureData(w http.ResponseWriter, r *http.Request) {
@@ -725,6 +725,27 @@ func TestE2ERequiredHeaderParams(t *testing.T) {
 				status, body := get(t, map[string]string{"X-User-ID": "user-1", "X-Tenant-ID": "7"})
 				assert.Equal(t, http.StatusOK, status)
 				assert.JSONEq(t, `{"userId":"user-1","tenantId":7}`, body)
+			})
+
+			t.Run("typed optional headers arrive", func(t *testing.T) {
+				status, body := get(t, map[string]string{
+					"X-User-ID": "user-1", "X-Tenant-ID": "7",
+					"X-Status": "active", "X-Since": "2026-11-14T10:00:00Z",
+				})
+				assert.Equal(t, http.StatusOK, status)
+				assert.JSONEq(t, `{"userId":"user-1","tenantId":7,"status":"active","since":"2026-11-14T10:00:00Z"}`, body)
+			})
+
+			t.Run("invalid enum header returns 400", func(t *testing.T) {
+				status, body := get(t, map[string]string{"X-User-ID": "user-1", "X-Tenant-ID": "7", "X-Status": "bogus-value"})
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.NotContains(t, body, "bogus-value")
+			})
+
+			t.Run("unparseable date-time header returns 400", func(t *testing.T) {
+				status, body := get(t, map[string]string{"X-User-ID": "user-1", "X-Tenant-ID": "7", "X-Since": "yesterday-ish"})
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.NotContains(t, body, "yesterday-ish")
 			})
 
 			t.Run("missing required string header returns 400", func(t *testing.T) {

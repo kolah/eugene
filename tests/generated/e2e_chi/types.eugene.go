@@ -4,6 +4,7 @@ package gen
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type EchoPayload struct {
@@ -51,8 +52,10 @@ type Resource struct {
 }
 
 type Whoami struct {
-	UserID   *string `json:"userId,omitempty"`
-	TenantID *int    `json:"tenantId,omitempty"`
+	UserID   *string    `json:"userId,omitempty"`
+	TenantID *int       `json:"tenantId,omitempty"`
+	Status   *Status    `json:"status,omitempty"`
+	Since    *time.Time `json:"since,omitempty"`
 }
 
 type SessionInfo struct {

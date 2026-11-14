@@ -12,14 +12,14 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type Mode string
+type XMode string
 
 const (
-	ModeCompact Mode = "compact"
-	ModeWide    Mode = "wide"
+	XModeCompact XMode = "compact"
+	XModeWide    XMode = "wide"
 )
 
-func (e Mode) IsValid() bool {
+func (e XMode) IsValid() bool {
 	switch e {
 	case "compact":
 		return true
@@ -73,6 +73,21 @@ func (w *Writer) SendRaw(eventType string, data []byte) error {
 	return nil
 }
 
+type GetPrefsHeaderParams struct {
+	XSid     string     `header:"X-Sid"`
+	XCount   *int       `header:"X-Count"`
+	XCount32 int32      `header:"X-Count32"`
+	XCount64 *int64     `header:"X-Count64"`
+	XRatio   *float64   `header:"X-Ratio"`
+	XBeta    *bool      `header:"X-Beta"`
+	XDevice  *uuid.UUID `header:"X-Device"`
+	XSince   *time.Time `header:"X-Since"`
+	XTheme   *Theme     `header:"X-Theme"`
+	XMode    *XMode     `header:"X-Mode"`
+	XToken   *Token     `header:"X-Token"`
+	XTags    []string   `header:"X-Tags"`
+}
+
 type GetPrefsCookieParams struct {
 	Sid     string
 	Count   *int
@@ -83,7 +98,7 @@ type GetPrefsCookieParams struct {
 	Device  *uuid.UUID
 	Since   *time.Time
 	Theme   *Theme
-	Mode    *Mode
+	Mode    *XMode
 	Token   *Token
 }
 
@@ -94,7 +109,7 @@ type StreamEventsCookieParams struct {
 
 type ServerInterface interface {
 	// GetPrefs
-	GetPrefs(ctx echo.Context, cookies GetPrefsCookieParams) error
+	GetPrefs(ctx echo.Context, headers GetPrefsHeaderParams, cookies GetPrefsCookieParams) error
 	// StreamEvents (streaming)
 	StreamEvents(ctx echo.Context, cookies StreamEventsCookieParams) error
 }
@@ -104,6 +119,25 @@ type ServerInterfaceWrapper struct {
 }
 
 func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
+	if ctx.Request().Header.Get("X-Sid") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Sid")
+	}
+	if ctx.Request().Header.Get("X-Count32") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Count32")
+	}
+	if ctx.Request().Header.Get("X-Tags") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tags")
+	}
+	var headers GetPrefsHeaderParams
+	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	}
+	if headers.XTheme != nil && !headers.XTheme.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Theme")
+	}
+	if headers.XMode != nil && !headers.XMode.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Mode")
+	}
 	var cookies GetPrefsCookieParams
 	if c, err := ctx.Cookie("sid"); err == nil {
 		cookies.Sid = c.Value
@@ -170,7 +204,7 @@ func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
 		cookies.Theme = &typed
 	}
 	if c, err := ctx.Cookie("mode"); err == nil {
-		typed := Mode(c.Value)
+		typed := XMode(c.Value)
 		if !typed.IsValid() {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid mode")
 		}
@@ -180,7 +214,7 @@ func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
 		typed := Token(c.Value)
 		cookies.Token = &typed
 	}
-	return w.Handler.GetPrefs(ctx, cookies)
+	return w.Handler.GetPrefs(ctx, headers, cookies)
 }
 
 func (w *ServerInterfaceWrapper) StreamEvents(ctx echo.Context) error {

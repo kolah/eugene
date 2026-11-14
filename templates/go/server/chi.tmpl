@@ -246,78 +246,22 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 {{- if .HasHeaderParams }}
 	var headers {{ .ID | pascalCase }}HeaderParams
 {{- range .HeaderParams }}
-{{- if .Required }}
-	if r.Header.Get("{{ .Name }}") == "" {
-		http.Error(rw, "missing {{ .Name }}", http.StatusBadRequest)
-		return
-	}
-{{- end }}
 {{- if hasPrefix .Type "[]" }}
 	if values := r.Header.Values("{{ .Name }}"); len(values) > 0 {
 		{{ if .Required }}headers.{{ .GoName }} = values{{ else }}headers.{{ .GoName }} = &values{{ end }}
-	}
-{{- else if eq .Type "string" }}
-	if v := r.Header.Get("{{ .Name }}"); v != "" {
-		{{ if .Required }}headers.{{ .GoName }} = v{{ else }}headers.{{ .GoName }} = &v{{ end }}
-	}
-{{- else if eq .Type "int" }}
-	if v := r.Header.Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			{{ if .Required }}headers.{{ .GoName }} = parsed{{ else }}headers.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
-{{- else if eq .Type "int64" }}
-	if v := r.Header.Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseInt(v, 10, 64); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			{{ if .Required }}headers.{{ .GoName }} = parsed{{ else }}headers.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
-{{- else if eq .Type "int32" }}
-	if v := r.Header.Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseInt(v, 10, 32); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			val := int32(parsed)
-			{{ if .Required }}headers.{{ .GoName }} = val{{ else }}headers.{{ .GoName }} = &val{{ end }}
-		}
-	}
-{{- else if eq .Type "bool" }}
-	if v := r.Header.Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseBool(v); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			{{ if .Required }}headers.{{ .GoName }} = parsed{{ else }}headers.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
-{{- else if eq .Type "uuid.UUID" }}
-	if v := r.Header.Get("{{ .Name }}"); v != "" {
-		if parsed, err := uuid.Parse(v); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			{{ if .Required }}headers.{{ .GoName }} = parsed{{ else }}headers.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
+	}{{ if .Required }} else {
+{{- template "paramError" dict "Echo" false "Writer" "rw" "Message" (printf "missing %s" .Name) }}
+	}{{ end }}
 {{- else }}
-	if v := r.Header.Get("{{ .Name }}"); v != "" {
-		{{ if .Required }}typed := {{ .Type }}(v)
-		headers.{{ .GoName }} = typed{{ else }}typed := {{ .Type }}(v)
-		headers.{{ .GoName }} = &typed{{ end }}
-	}
+{{- template "scalarParam" dict "Source" "header" "Echo" false "Writer" "rw" "Target" "headers" "Param" . }}
 {{- end }}
 {{- end }}
 {{- end }}
 {{- if .HasCookieParams }}
 	var cookies {{ .ID | pascalCase }}CookieParams
-{{- template "cookieParams" dict "Echo" false "Writer" "rw" "Target" "cookies" "Params" .CookieParams }}
+{{- range .CookieParams }}
+{{- template "scalarParam" dict "Source" "cookie" "Echo" false "Writer" "rw" "Target" "cookies" "Param" . }}
+{{- end }}
 {{- end }}
 {{- if .HasQueryString }}
 	var {{ .QueryString.GoName | camelCase }} {{ .QueryString.Type }}

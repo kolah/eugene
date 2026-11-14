@@ -4,6 +4,7 @@ package gen
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -87,11 +88,11 @@ func (h *StrictEchoHandler) GetItem(ctx echo.Context) error {
 		request.XRequestID = &v
 	}
 	if v := ctx.Request().Header.Get("X-Retry-Count"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Retry-Count")
-		} else {
-			request.XRetryCount = &parsed
 		}
+		request.XRetryCount = &parsed
 	}
 
 	response, err := h.ssi.GetItem(ctx.Request().Context(), request)
@@ -185,21 +186,33 @@ func (h *StrictEchoHandler) GetSession(ctx echo.Context) error {
 // GetWhoami handles GET /whoami
 func (h *StrictEchoHandler) GetWhoami(ctx echo.Context) error {
 	var request GetWhoamiRequestObject
-	if ctx.Request().Header.Get("X-User-ID") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-User-ID")
-	}
 	if v := ctx.Request().Header.Get("X-User-ID"); v != "" {
 		request.XUserID = v
-	}
-	if ctx.Request().Header.Get("X-Tenant-ID") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tenant-ID")
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-User-ID")
 	}
 	if v := ctx.Request().Header.Get("X-Tenant-ID"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Tenant-ID")
-		} else {
-			request.XTenantID = parsed
 		}
+		request.XTenantID = parsed
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tenant-ID")
+	}
+	if v := ctx.Request().Header.Get("X-Status"); v != "" {
+		typed := Status(v)
+		if !typed.IsValid() {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Status")
+		}
+		request.XStatus = &typed
+	}
+	if v := ctx.Request().Header.Get("X-Since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Since")
+		}
+		request.XSince = &parsed
 	}
 
 	response, err := h.ssi.GetWhoami(ctx.Request().Context(), request)

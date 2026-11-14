@@ -188,10 +188,19 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
 	}
+{{- range .HeaderParams }}
+{{- if .IsEnum }}
+	if {{ if not .Required }}headers.{{ .GoName }} != nil && {{ end }}!headers.{{ .GoName }}.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+	}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- if .HasCookieParams }}
 	var cookies {{ .ID | pascalCase }}CookieParams
-{{- template "cookieParams" dict "Echo" true "Writer" "" "Target" "cookies" "Params" .CookieParams }}
+{{- range .CookieParams }}
+{{- template "scalarParam" dict "Source" "cookie" "Echo" true "Writer" "" "Target" "cookies" "Param" . }}
+{{- end }}
 {{- end }}
 {{- if .HasQueryString }}
 	var {{ .QueryString.GoName | camelCase }} {{ .QueryString.Type }}

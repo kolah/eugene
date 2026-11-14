@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -45,8 +46,10 @@ type GetSessionCookieParams struct {
 }
 
 type GetWhoamiHeaderParams struct {
-	XUserID   string `header:"X-User-ID"`
-	XTenantID int    `header:"X-Tenant-ID"`
+	XUserID   string     `header:"X-User-ID"`
+	XTenantID int        `header:"X-Tenant-ID"`
+	XStatus   *Status    `header:"X-Status"`
+	XSince    *time.Time `header:"X-Since"`
 }
 
 type ServerInterface interface {
@@ -174,6 +177,9 @@ func (w *ServerInterfaceWrapper) GetWhoami(ctx echo.Context) error {
 	var headers GetWhoamiHeaderParams
 	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	}
+	if headers.XStatus != nil && !headers.XStatus.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Status")
 	}
 	return w.Handler.GetWhoami(ctx, headers)
 }

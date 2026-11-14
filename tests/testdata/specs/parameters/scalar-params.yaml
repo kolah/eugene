@@ -1,6 +1,6 @@
 openapi: "3.0.3"
 info:
-  title: Cookie Parameter Types
+  title: Scalar Header and Cookie Parameters
   version: "1.0.0"
 paths:
   /prefs:
@@ -18,6 +18,18 @@ paths:
         - {name: theme, in: cookie, schema: {$ref: "#/components/schemas/Theme"}}
         - {name: mode, in: cookie, schema: {type: string, enum: [compact, wide]}}
         - {name: token, in: cookie, schema: {$ref: "#/components/schemas/Token"}}
+        - {name: X-Sid, in: header, required: true, schema: {type: string}}
+        - {name: X-Count, in: header, schema: {type: integer}}
+        - {name: X-Count32, in: header, required: true, schema: {type: integer, format: int32}}
+        - {name: X-Count64, in: header, schema: {type: integer, format: int64}}
+        - {name: X-Ratio, in: header, schema: {type: number}}
+        - {name: X-Beta, in: header, schema: {type: boolean}}
+        - {name: X-Device, in: header, schema: {type: string, format: uuid}}
+        - {name: X-Since, in: header, schema: {type: string, format: date-time}}
+        - {name: X-Theme, in: header, schema: {$ref: "#/components/schemas/Theme"}}
+        - {name: X-Mode, in: header, schema: {type: string, enum: [compact, wide]}}
+        - {name: X-Token, in: header, schema: {$ref: "#/components/schemas/Token"}}
+        - {name: X-Tags, in: header, required: true, schema: {type: array, items: {type: string}}}
       responses:
         "204":
           description: ok

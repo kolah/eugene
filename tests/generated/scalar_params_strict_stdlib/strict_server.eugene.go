@@ -6,23 +6,114 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
-// StrictChiHandler wraps a StrictServerInterface to handle Chi requests.
-type StrictChiHandler struct {
+// StrictHandler wraps a StrictServerInterface to handle stdlib requests.
+type StrictHandler struct {
 	ssi StrictServerInterface
 }
 
-// NewStrictHandler creates a new StrictChiHandler.
-func NewStrictHandler(ssi StrictServerInterface) *StrictChiHandler {
-	return &StrictChiHandler{ssi: ssi}
+// NewStrictHandler creates a new StrictHandler.
+func NewStrictHandler(ssi StrictServerInterface) *StrictHandler {
+	return &StrictHandler{ssi: ssi}
 }
 
 // GetPrefs handles GET /prefs
-func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
+func (h *StrictHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	var request GetPrefsRequestObject
+	if v := r.Header.Get("X-Sid"); v != "" {
+		request.XSid = v
+	} else {
+		http.Error(w, "missing X-Sid", http.StatusBadRequest)
+		return
+	}
+	if v := r.Header.Get("X-Count"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			http.Error(w, "invalid X-Count", http.StatusBadRequest)
+			return
+		}
+		request.XCount = &parsed
+	}
+	if v := r.Header.Get("X-Count32"); v != "" {
+		parsed64, err := strconv.ParseInt(v, 10, 32)
+		parsed := int32(parsed64)
+		if err != nil {
+			http.Error(w, "invalid X-Count32", http.StatusBadRequest)
+			return
+		}
+		request.XCount32 = parsed
+	} else {
+		http.Error(w, "missing X-Count32", http.StatusBadRequest)
+		return
+	}
+	if v := r.Header.Get("X-Count64"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid X-Count64", http.StatusBadRequest)
+			return
+		}
+		request.XCount64 = &parsed
+	}
+	if v := r.Header.Get("X-Ratio"); v != "" {
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			http.Error(w, "invalid X-Ratio", http.StatusBadRequest)
+			return
+		}
+		request.XRatio = &parsed
+	}
+	if v := r.Header.Get("X-Beta"); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			http.Error(w, "invalid X-Beta", http.StatusBadRequest)
+			return
+		}
+		request.XBeta = &parsed
+	}
+	if v := r.Header.Get("X-Device"); v != "" {
+		parsed, err := uuid.Parse(v)
+		if err != nil {
+			http.Error(w, "invalid X-Device", http.StatusBadRequest)
+			return
+		}
+		request.XDevice = &parsed
+	}
+	if v := r.Header.Get("X-Since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(w, "invalid X-Since", http.StatusBadRequest)
+			return
+		}
+		request.XSince = &parsed
+	}
+	if v := r.Header.Get("X-Theme"); v != "" {
+		typed := Theme(v)
+		if !typed.IsValid() {
+			http.Error(w, "invalid X-Theme", http.StatusBadRequest)
+			return
+		}
+		request.XTheme = &typed
+	}
+	if v := r.Header.Get("X-Mode"); v != "" {
+		typed := XMode(v)
+		if !typed.IsValid() {
+			http.Error(w, "invalid X-Mode", http.StatusBadRequest)
+			return
+		}
+		request.XMode = &typed
+	}
+	if v := r.Header.Get("X-Token"); v != "" {
+		typed := Token(v)
+		request.XToken = &typed
+	}
+	if values := r.Header.Values("X-Tags"); len(values) > 0 {
+		request.XTags = values
+	} else {
+		http.Error(w, "missing X-Tags", http.StatusBadRequest)
+		return
+	}
 	if c, err := r.Cookie("sid"); err == nil {
 		request.Sid = c.Value
 	} else {
@@ -98,7 +189,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		request.Theme = &typed
 	}
 	if c, err := r.Cookie("mode"); err == nil {
-		typed := Mode(c.Value)
+		typed := XMode(c.Value)
 		if !typed.IsValid() {
 			http.Error(w, "invalid mode", http.StatusBadRequest)
 			return
@@ -122,7 +213,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 }
 
 // StreamEvents handles GET /events
-func (h *StrictChiHandler) StreamEvents(w http.ResponseWriter, r *http.Request) {
+func (h *StrictHandler) StreamEvents(w http.ResponseWriter, r *http.Request) {
 	var request StreamEventsRequestObject
 	if c, err := r.Cookie("sid"); err == nil {
 		request.Sid = c.Value
@@ -150,10 +241,10 @@ func (h *StrictChiHandler) StreamEvents(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// RegisterStrictHandlers registers all strict handlers with the Chi router.
-func RegisterStrictHandlers(r chi.Router, ssi StrictServerInterface) {
+// RegisterStrictHandlers registers all strict handlers with the http.ServeMux.
+func RegisterStrictHandlers(mux *http.ServeMux, ssi StrictServerInterface) {
 	h := NewStrictHandler(ssi)
 
-	r.Method("GET", "/prefs", http.HandlerFunc(h.GetPrefs))
-	r.Method("GET", "/events", http.HandlerFunc(h.StreamEvents))
+	mux.HandleFunc("GET /prefs", h.GetPrefs)
+	mux.HandleFunc("GET /events", h.StreamEvents)
 }

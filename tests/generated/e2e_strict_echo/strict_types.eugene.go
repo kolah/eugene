@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 )
 
 // EchoJSONRequestObject represents the request for EchoJSON.
@@ -57,8 +58,10 @@ type GetSessionRequestObject struct {
 
 // GetWhoamiRequestObject represents the request for GetWhoami.
 type GetWhoamiRequestObject struct {
-	XUserID   string // header parameter
-	XTenantID int    // header parameter
+	XUserID   string     // header parameter
+	XTenantID int        // header parameter
+	XStatus   *Status    // header parameter
+	XSince    *time.Time // header parameter
 }
 
 // CreateShapeRequestObject represents the request for CreateShape.

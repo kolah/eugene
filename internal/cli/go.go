@@ -51,7 +51,7 @@ func NewGoCmd() *cobra.Command {
 	flags.StringP("package", "p", "", "Go package name")
 	flags.StringP("server-framework", "f", "", "Server framework: echo, chi, stdlib")
 	flags.String("enum-strategy", "", "Enum strategy: const, type, struct")
-	flags.String("uuid-package", "", "UUID type: string, google, gofrs")
+	flags.String("uuid-package", "", "UUID type: string, google, gofrs, stdlib (Go 1.27+)")
 	flags.String("nullable-strategy", "", "Nullable strategy: pointer, nullable")
 	flags.String("allof-strategy", "", "AllOf strategy: embed (default), flatten")
 	flags.Bool("enable-yaml-tags", false, "Generate yaml tags")

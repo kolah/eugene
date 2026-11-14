@@ -342,7 +342,7 @@ func (r *TypeResolver) uuidType() string {
 	switch r.cfg.UUIDPackage {
 	case "google":
 		return "uuid.UUID"
-	case "gofrs":
+	case "gofrs", "stdlib":
 		return "uuid.UUID"
 	default:
 		return "string"
@@ -359,6 +359,8 @@ func (r *TypeResolver) UUIDImport() string {
 		return "github.com/google/uuid"
 	case "gofrs":
 		return "github.com/gofrs/uuid/v5"
+	case "stdlib":
+		return "uuid"
 	default:
 		return ""
 	}

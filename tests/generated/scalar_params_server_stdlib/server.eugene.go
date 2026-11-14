@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 type XMode string

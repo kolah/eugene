@@ -224,9 +224,9 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid enum strategy: %s (valid: const, type, struct)", c.Go.Types.EnumStrategy)
 	}
 
-	validUUIDPackages := map[string]bool{"": true, "string": true, "google": true, "gofrs": true}
+	validUUIDPackages := map[string]bool{"": true, "string": true, "google": true, "gofrs": true, "stdlib": true}
 	if !validUUIDPackages[c.Go.Types.UUIDPackage] {
-		return fmt.Errorf("invalid uuid package: %s (valid: string, google, gofrs)", c.Go.Types.UUIDPackage)
+		return fmt.Errorf("invalid uuid package: %s (valid: string, google, gofrs, stdlib)", c.Go.Types.UUIDPackage)
 	}
 
 	validNullableStrategies := map[string]bool{"": true, "pointer": true, "nullable": true}

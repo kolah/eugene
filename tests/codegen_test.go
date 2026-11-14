@@ -240,7 +240,7 @@ func TestGeneratedCodeCompiles(t *testing.T) {
 			name:            "scalar_params_server_stdlib",
 			targets:         []string{"types", "server", "client"},
 			serverFramework: "stdlib",
-			uuidPackage:     "google",
+			uuidPackage:     "stdlib",
 			outputDir:       "generated/scalar_params_server_stdlib",
 			specFile:        "testdata/specs/parameters/scalar-params.yaml",
 		},

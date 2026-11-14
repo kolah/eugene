@@ -36,6 +36,12 @@ type GetDayHeaderParams struct {
 	XUntil *string
 }
 
+type GetSessionCookieParams struct {
+	SessionID string
+	Status    *Status
+	Visits    *int
+}
+
 type GetWhoamiHeaderParams struct {
 	XUserID   string
 	XTenantID int
@@ -57,7 +63,7 @@ type ServerInterface interface {
 	// DeleteResource
 	DeleteResource(w http.ResponseWriter, r *http.Request, id string)
 	// GetSession
-	GetSession(w http.ResponseWriter, r *http.Request)
+	GetSession(w http.ResponseWriter, r *http.Request, cookies GetSessionCookieParams)
 	// GetWhoami
 	GetWhoami(w http.ResponseWriter, r *http.Request, headers GetWhoamiHeaderParams)
 	// GetSecureData
@@ -153,7 +159,30 @@ func (w *ServerInterfaceWrapper) DeleteResource(rw http.ResponseWriter, r *http.
 }
 
 func (w *ServerInterfaceWrapper) GetSession(rw http.ResponseWriter, r *http.Request) {
-	w.Handler.GetSession(rw, r)
+	var cookies GetSessionCookieParams
+	if c, err := r.Cookie("session_id"); err == nil {
+		cookies.SessionID = c.Value
+	} else {
+		http.Error(rw, "missing session_id", http.StatusBadRequest)
+		return
+	}
+	if c, err := r.Cookie("status"); err == nil {
+		typed := Status(c.Value)
+		if !typed.IsValid() {
+			http.Error(rw, "invalid status", http.StatusBadRequest)
+			return
+		}
+		cookies.Status = &typed
+	}
+	if c, err := r.Cookie("visits"); err == nil {
+		parsed, err := strconv.Atoi(c.Value)
+		if err != nil {
+			http.Error(rw, "invalid visits", http.StatusBadRequest)
+			return
+		}
+		cookies.Visits = &parsed
+	}
+	w.Handler.GetSession(rw, r, cookies)
 }
 
 func (w *ServerInterfaceWrapper) GetWhoami(rw http.ResponseWriter, r *http.Request) {

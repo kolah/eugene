@@ -1,0 +1,54 @@
+{{- /* Binds in: cookie params. Called with dict "Echo" bool "Writer" string "Target" string "Params" []parameterData. */ -}}
+{{- define "cookieParams" }}
+{{- $echo := .Echo }}
+{{- $writer := .Writer }}
+{{- $target := .Target }}
+{{- range .Params }}
+	if c, err := {{ if $echo }}ctx.Cookie{{ else }}r.Cookie{{ end }}("{{ .Name }}"); err == nil {
+{{- if eq .Type "string" }}
+		{{ $target }}.{{ .GoName }} = {{ if not .Required }}&{{ end }}c.Value
+{{- else if .IsEnum }}
+		typed := {{ .Type }}(c.Value)
+		if !typed.IsValid() {
+{{- template "cookieParamError" dict "Echo" $echo "Writer" $writer "Message" (printf "invalid %s" .Name) }}
+		}
+		{{ $target }}.{{ .GoName }} = {{ if not .Required }}&{{ end }}typed
+{{- else if eq .Type "int" "int32" "int64" "float64" "bool" "uuid.UUID" "time.Time" }}
+{{- if eq .Type "int" }}
+		parsed, err := strconv.Atoi(c.Value)
+{{- else if eq .Type "int32" }}
+		parsed64, err := strconv.ParseInt(c.Value, 10, 32)
+		parsed := int32(parsed64)
+{{- else if eq .Type "int64" }}
+		parsed, err := strconv.ParseInt(c.Value, 10, 64)
+{{- else if eq .Type "float64" }}
+		parsed, err := strconv.ParseFloat(c.Value, 64)
+{{- else if eq .Type "bool" }}
+		parsed, err := strconv.ParseBool(c.Value)
+{{- else if eq .Type "uuid.UUID" }}
+		parsed, err := uuid.Parse(c.Value)
+{{- else }}
+		parsed, err := time.Parse(time.RFC3339, c.Value)
+{{- end }}
+		if err != nil {
+{{- template "cookieParamError" dict "Echo" $echo "Writer" $writer "Message" (printf "invalid %s" .Name) }}
+		}
+		{{ $target }}.{{ .GoName }} = {{ if not .Required }}&{{ end }}parsed
+{{- else }}
+		typed := {{ .Type }}(c.Value)
+		{{ $target }}.{{ .GoName }} = {{ if not .Required }}&{{ end }}typed
+{{- end }}
+	}{{ if .Required }} else {
+{{- template "cookieParamError" dict "Echo" $echo "Writer" $writer "Message" (printf "missing %s" .Name) }}
+	}{{ end }}
+{{- end }}
+{{- end }}
+
+{{- define "cookieParamError" }}
+{{- if .Echo }}
+		return echo.NewHTTPError(http.StatusBadRequest, "{{ .Message }}")
+{{- else }}
+		http.Error({{ .Writer }}, "{{ .Message }}", http.StatusBadRequest)
+		return
+{{- end }}
+{{- end }}

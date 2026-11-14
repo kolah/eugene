@@ -39,6 +39,7 @@ type serverFeatures struct {
 	HasQueryString    bool // any operation uses querystring param (OpenAPI 3.2)
 	HasQueryParams    bool // any operation uses in: query params
 	HasHeaderParams   bool // any operation uses in: header params
+	HasCookieParams   bool // any operation uses in: cookie params
 	HasCallbacks      bool // any operation defines callbacks
 	HasMultipart      bool // any operation uses multipart/form-data
 	HasFormUrlEncoded bool // any operation uses application/x-www-form-urlencoded
@@ -90,6 +91,7 @@ type operationData struct {
 	Parameters       []parameterData // path params only
 	QueryParams      []parameterData // in: query params
 	HeaderParams     []parameterData // in: header params
+	CookieParams     []parameterData // in: cookie params
 	QueryString      *querystringData // OpenAPI 3.2: in: querystring
 	RequestBody      *requestBodyData
 	Responses        []responseData
@@ -97,6 +99,7 @@ type operationData struct {
 	HasBody          bool
 	HasQueryParams   bool
 	HasHeaderParams  bool
+	HasCookieParams  bool
 	HasQueryString   bool
 	IsStreaming      bool
 	IsMultipart      bool
@@ -199,8 +202,14 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 				opData.HeaderParams = append(opData.HeaderParams, pd)
 				opData.HasHeaderParams = true
 				data.Features.HasHeaderParams = true
+			case model.LocationCookie:
+				opData.CookieParams = append(opData.CookieParams, pd)
+				opData.HasCookieParams = true
+				data.Features.HasCookieParams = true
 			case model.LocationPath:
 				opData.Parameters = append(opData.Parameters, pd)
+			default:
+				return "", fmt.Errorf("operation %q: parameter %q is in %q, which the server cannot bind", op.ID, p.Name, p.In)
 			}
 		}
 
@@ -300,7 +309,7 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string,
 
 	// Check if time import is needed
 	for _, op := range data.Operations {
-		for _, p := range op.Parameters {
+		for _, p := range append(op.Parameters, op.CookieParams...) {
 			if p.Type == "time.Time" {
 				data.TimeImport = true
 				break

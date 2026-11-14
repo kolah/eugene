@@ -1,0 +1,44 @@
+openapi: "3.0.3"
+info:
+  title: Cookie Parameter Types
+  version: "1.0.0"
+paths:
+  /prefs:
+    get:
+      operationId: getPrefs
+      parameters:
+        - {name: sid, in: cookie, required: true, schema: {type: string}}
+        - {name: count, in: cookie, schema: {type: integer}}
+        - {name: count32, in: cookie, required: true, schema: {type: integer, format: int32}}
+        - {name: count64, in: cookie, schema: {type: integer, format: int64}}
+        - {name: ratio, in: cookie, schema: {type: number}}
+        - {name: beta, in: cookie, schema: {type: boolean}}
+        - {name: device, in: cookie, schema: {type: string, format: uuid}}
+        - {name: since, in: cookie, schema: {type: string, format: date-time}}
+        - {name: theme, in: cookie, schema: {$ref: "#/components/schemas/Theme"}}
+        - {name: mode, in: cookie, schema: {type: string, enum: [compact, wide]}}
+        - {name: token, in: cookie, schema: {$ref: "#/components/schemas/Token"}}
+      responses:
+        "204":
+          description: ok
+  /events:
+    get:
+      operationId: streamEvents
+      parameters:
+        - {name: sid, in: cookie, required: true, schema: {type: string}}
+        - {name: since, in: cookie, schema: {type: string, format: date-time}}
+      responses:
+        "200":
+          description: events
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/Event"
+components:
+  schemas:
+    Theme: {type: string, enum: [light, dark]}
+    Token: {type: string}
+    Event:
+      type: object
+      properties:
+        id: {type: string}

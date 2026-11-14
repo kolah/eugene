@@ -100,22 +100,13 @@ func (h *BasicEchoHandler) DeleteResource(ctx echo.Context, id string) error {
 	return ctx.NoContent(http.StatusNoContent)
 }
 
-func (h *BasicEchoHandler) GetSession(ctx echo.Context) error {
-	sessionID, err := ctx.Cookie("session_id")
-	if err != nil {
-		code := "MISSING_COOKIE"
-		msg := "session_id cookie required"
-		return ctx.JSON(http.StatusBadRequest, basic.ErrorResponse{
-			Code:    &code,
-			Message: &msg,
-		})
-	}
+func (h *BasicEchoHandler) GetSession(ctx echo.Context, cookies basic.GetSessionCookieParams) error {
 	userID := "user-456"
-	expiresAt := "2025-12-31T23:59:59Z"
 	return ctx.JSON(http.StatusOK, basic.SessionInfo{
-		SessionID: &sessionID.Value,
+		SessionID: &cookies.SessionID,
 		UserID:    &userID,
-		ExpiresAt: &expiresAt,
+		Status:    cookies.Status,
+		Visits:    cookies.Visits,
 	})
 }
 
@@ -196,14 +187,13 @@ func (h *StrictEchoHandler) DeleteResource(ctx context.Context, req strict.Delet
 	return strict.DeleteResource204Response{}, nil
 }
 
-func (h *StrictEchoHandler) GetSession(ctx context.Context) (strict.GetSessionResponseObject, error) {
-	sessionID := "session-from-cookie"
+func (h *StrictEchoHandler) GetSession(ctx context.Context, req strict.GetSessionRequestObject) (strict.GetSessionResponseObject, error) {
 	userID := "user-456"
-	expiresAt := "2025-12-31T23:59:59Z"
 	return strict.GetSession200JSONResponse{
-		SessionID: &sessionID,
+		SessionID: &req.SessionID,
 		UserID:    &userID,
-		ExpiresAt: &expiresAt,
+		Status:    req.Status,
+		Visits:    req.Visits,
 	}, nil
 }
 
@@ -314,26 +304,14 @@ func (h *ChiHandler) DeleteResource(w http.ResponseWriter, r *http.Request, id s
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *ChiHandler) GetSession(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("session_id")
-	if err != nil {
-		code := "MISSING_COOKIE"
-		msg := "session_id cookie required"
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(chiGen.ErrorResponse{
-			Code:    &code,
-			Message: &msg,
-		})
-		return
-	}
+func (h *ChiHandler) GetSession(w http.ResponseWriter, r *http.Request, cookies chiGen.GetSessionCookieParams) {
 	userID := "user-456"
-	expiresAt := "2025-12-31T23:59:59Z"
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(chiGen.SessionInfo{
-		SessionID: &cookie.Value,
+		SessionID: &cookies.SessionID,
 		UserID:    &userID,
-		ExpiresAt: &expiresAt,
+		Status:    cookies.Status,
+		Visits:    cookies.Visits,
 	})
 }
 
@@ -464,26 +442,14 @@ func (h *StdlibHandler) DeleteResource(w http.ResponseWriter, r *http.Request, i
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *StdlibHandler) GetSession(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("session_id")
-	if err != nil {
-		code := "MISSING_COOKIE"
-		msg := "session_id cookie required"
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(stdlibGen.ErrorResponse{
-			Code:    &code,
-			Message: &msg,
-		})
-		return
-	}
+func (h *StdlibHandler) GetSession(w http.ResponseWriter, r *http.Request, cookies stdlibGen.GetSessionCookieParams) {
 	userID := "user-456"
-	expiresAt := "2025-12-31T23:59:59Z"
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stdlibGen.SessionInfo{
-		SessionID: &cookie.Value,
+		SessionID: &cookies.SessionID,
 		UserID:    &userID,
-		ExpiresAt: &expiresAt,
+		Status:    cookies.Status,
+		Visits:    cookies.Visits,
 	})
 }
 
@@ -1062,47 +1028,132 @@ func TestE2EMultipleStatusCodes(t *testing.T) {
 }
 
 func TestE2ECookieParams(t *testing.T) {
-	e := echo.New()
-	handler := &BasicEchoHandler{}
-	basic.RegisterHandlers(e, handler)
+	echoServer := echo.New()
+	basic.RegisterHandlers(echoServer, &BasicEchoHandler{})
+	strictServer := echo.New()
+	strict.RegisterStrictHandlers(strictServer, &StrictEchoHandler{})
 
-	server := httptest.NewServer(e)
-	defer server.Close()
+	servers := map[string]http.Handler{
+		"echo":        echoServer,
+		"strict echo": strictServer,
+		"chi":         chiGen.Handler(&ChiHandler{}),
+		"stdlib":      stdlibGen.Handler(&StdlibHandler{}),
+	}
+	for name, handler := range servers {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-	ctx := context.Background()
+			get := func(t *testing.T, cookie string) (int, string) {
+				req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL+"/session", nil)
+				require.NoError(t, err)
+				if cookie != "" {
+					req.Header.Set("Cookie", cookie)
+				}
+				resp, err := http.DefaultClient.Do(req)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				return resp.StatusCode, string(body)
+			}
 
-	t.Run("Cookie parameter extraction", func(t *testing.T) {
-		httpClient := &http.Client{}
-		req, err := http.NewRequestWithContext(ctx, "GET", server.URL+"/session", nil)
+			t.Run("required and typed cookies arrive", func(t *testing.T) {
+				status, body := get(t, "session_id=abc; status=active; visits=3")
+				assert.Equal(t, http.StatusOK, status)
+				assert.JSONEq(t, `{"sessionId":"abc","userId":"user-456","status":"active","visits":3}`, body)
+			})
+
+			t.Run("absent optional cookies are nil", func(t *testing.T) {
+				status, body := get(t, "session_id=abc")
+				assert.Equal(t, http.StatusOK, status)
+				assert.JSONEq(t, `{"sessionId":"abc","userId":"user-456"}`, body)
+			})
+
+			t.Run("empty required cookie is present", func(t *testing.T) {
+				status, body := get(t, "session_id=")
+				assert.Equal(t, http.StatusOK, status)
+				assert.JSONEq(t, `{"sessionId":"","userId":"user-456"}`, body)
+			})
+
+			t.Run("first of repeated cookies wins", func(t *testing.T) {
+				status, body := get(t, "session_id=first; session_id=second")
+				assert.Equal(t, http.StatusOK, status)
+				assert.Contains(t, body, `"sessionId":"first"`)
+			})
+
+			t.Run("missing required cookie returns 400", func(t *testing.T) {
+				status, body := get(t, "status=active")
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Contains(t, body, "missing session_id")
+			})
+
+			t.Run("invalid enum cookie returns 400 without echoing it", func(t *testing.T) {
+				status, body := get(t, "session_id=abc; status=secret-token-value")
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Contains(t, body, "invalid status")
+				assert.NotContains(t, body, "secret-token-value")
+			})
+
+			t.Run("unparseable integer cookie returns 400 without echoing it", func(t *testing.T) {
+				status, body := get(t, "session_id=abc; visits=secret-token-value")
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Contains(t, body, "invalid visits")
+				assert.NotContains(t, body, "secret-token-value")
+			})
+		})
+	}
+
+	t.Run("clients send cookies", func(t *testing.T) {
+		visits := 5
+		check := func(t *testing.T, sessionID *string, status *string, gotVisits *int) {
+			require.NotNil(t, sessionID)
+			assert.Equal(t, "client-session", *sessionID)
+			require.NotNil(t, status)
+			assert.Equal(t, "completed", *status)
+			require.NotNil(t, gotVisits)
+			assert.Equal(t, visits, *gotVisits)
+		}
+
+		echoURL := httptest.NewServer(echoServer)
+		defer echoURL.Close()
+		echoStatus := basic.StatusCompleted
+		echoResp, err := basic.NewClient(echoURL.URL).GetSession(context.Background(), &basic.GetSessionParams{
+			SessionID: "client-session", Status: &echoStatus, Visits: &visits,
+		})
 		require.NoError(t, err)
-		req.AddCookie(&http.Cookie{Name: "session_id", Value: "test-session-123"})
+		require.NotNil(t, echoResp.JSON200)
+		check(t, echoResp.JSON200.SessionID, (*string)(echoResp.JSON200.Status), echoResp.JSON200.Visits)
 
-		resp, err := httpClient.Do(req)
+		strictURL := httptest.NewServer(strictServer)
+		defer strictURL.Close()
+		strictStatus := strict.StatusCompleted
+		strictResp, err := strict.NewClient(strictURL.URL).GetSession(context.Background(), &strict.GetSessionParams{
+			SessionID: "client-session", Status: &strictStatus, Visits: &visits,
+		})
 		require.NoError(t, err)
-		defer resp.Body.Close()
+		require.NotNil(t, strictResp.JSON200)
+		check(t, strictResp.JSON200.SessionID, (*string)(strictResp.JSON200.Status), strictResp.JSON200.Visits)
 
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-		body, err := io.ReadAll(resp.Body)
+		chiURL := httptest.NewServer(chiGen.Handler(&ChiHandler{}))
+		defer chiURL.Close()
+		chiStatus := chiGen.StatusCompleted
+		chiResp, err := chiGen.NewClient(chiURL.URL).GetSession(context.Background(), &chiGen.GetSessionParams{
+			SessionID: "client-session", Status: &chiStatus, Visits: &visits,
+		})
 		require.NoError(t, err)
+		require.NotNil(t, chiResp.JSON200)
+		check(t, chiResp.JSON200.SessionID, (*string)(chiResp.JSON200.Status), chiResp.JSON200.Visits)
 
-		var session basic.SessionInfo
-		err = json.Unmarshal(body, &session)
+		stdlibURL := httptest.NewServer(stdlibGen.Handler(&StdlibHandler{}))
+		defer stdlibURL.Close()
+		stdlibStatus := stdlibGen.StatusCompleted
+		stdlibResp, err := stdlibGen.NewClient(stdlibURL.URL).GetSession(context.Background(), &stdlibGen.GetSessionParams{
+			SessionID: "client-session", Status: &stdlibStatus, Visits: &visits,
+		})
 		require.NoError(t, err)
-		assert.Equal(t, "test-session-123", *session.SessionID)
-		assert.Equal(t, "user-456", *session.UserID)
-	})
-
-	t.Run("Missing cookie returns error", func(t *testing.T) {
-		httpClient := &http.Client{}
-		req, err := http.NewRequestWithContext(ctx, "GET", server.URL+"/session", nil)
-		require.NoError(t, err)
-
-		resp, err := httpClient.Do(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		require.NotNil(t, stdlibResp.JSON200)
+		check(t, stdlibResp.JSON200.SessionID, (*string)(stdlibResp.JSON200.Status), stdlibResp.JSON200.Visits)
 	})
 }
 

@@ -168,3 +168,37 @@ func TestTransformRejectsUnsafeSpecStrings(t *testing.T) {
 		})
 	}
 }
+
+func TestTransformAcceptsScalarCookies(t *testing.T) {
+	err := transformYAML(t,
+		op(`    parameters:
+      - {name: sid, in: cookie, required: true, schema: {type: string}}
+      - {name: visits, in: cookie, schema: {type: integer, format: int64}}
+      - {name: ratio, in: cookie, schema: {type: number}}
+      - {name: beta, in: cookie, schema: {type: boolean}}
+      - {name: at, in: cookie, schema: {type: string, format: date-time}}
+      - {name: theme, in: cookie, schema: {$ref: "#/components/schemas/Theme"}}
+      - {name: mode, in: cookie, schema: {type: string, enum: [a, b]}}`, ""),
+		`Theme: {type: string, enum: [light, dark]}`)
+	require.NoError(t, err)
+}
+
+func TestTransformRejectsUnsupportedCookies(t *testing.T) {
+	tests := map[string]string{
+		"array":             `{type: array, items: {type: string}}`,
+		"object":            `{type: object, properties: {a: {type: string}}}`,
+		"object ref":        `{$ref: "#/components/schemas/Obj"}`,
+		"binary string":     `{type: string, format: binary}`,
+		"integer enum":      `{type: integer, enum: [1, 2]}`,
+		"custom go type":    `{type: string, x-oink-go-type: time.Duration}`,
+		"oneOf composition": `{oneOf: [{type: string}, {type: integer}]}`,
+	}
+	for name, schema := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := transformYAML(t,
+				op("    parameters:\n      - {name: prefs, in: cookie, schema: "+schema+"}", ""),
+				`Obj: {type: object, properties: {a: {type: string}}}`)
+			require.ErrorContains(t, err, `cookie parameter "prefs" in operation "getX"`)
+		})
+	}
+}

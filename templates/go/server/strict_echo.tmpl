@@ -3,7 +3,7 @@ package {{ .Package }}
 
 import (
 	"net/http"
-{{- if or .HasQueryParams .HasHeaderParams }}
+{{- if or .HasQueryParams .HasHeaderParams .HasCookieParams }}
 	"strconv"
 {{- end }}
 {{- if .TimeImport }}
@@ -28,7 +28,7 @@ func NewStrictHandler(ssi StrictServerInterface) *StrictEchoHandler {
 {{ range .Operations }}
 // {{ .ID }} handles {{ .Method }} {{ .Path }}
 func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
-{{- if or .PathParams .QueryParams .HeaderParams .QueryString .RequestBody }}
+{{- if or .PathParams .QueryParams .HeaderParams .CookieParams .QueryString .RequestBody }}
 	var request {{ .ID }}RequestObject
 {{- end }}
 {{- range .PathParams }}
@@ -161,6 +161,7 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 	}
 {{- end }}
 {{- end }}
+{{- template "cookieParams" dict "Echo" true "Writer" "" "Target" "request" "Params" .CookieParams }}
 {{- if .QueryString }}
 	if err := ctx.Bind(&request.{{ .QueryString.GoName }}); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid querystring")
@@ -177,7 +178,7 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 	}{{ end }}
 {{- end }}
 
-	response, err := h.ssi.{{ .ID }}(ctx.Request().Context(){{ if or .PathParams .QueryParams .HeaderParams .QueryString .RequestBody }}, request{{ end }})
+	response, err := h.ssi.{{ .ID }}(ctx.Request().Context(){{ if or .PathParams .QueryParams .HeaderParams .CookieParams .QueryString .RequestBody }}, request{{ end }})
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,7 @@ package {{ .Package }}
 import (
 	"encoding/json"
 	"net/http"
-{{- if or .HasQueryParams .HasHeaderParams }}
+{{- if or .HasQueryParams .HasHeaderParams .HasCookieParams }}
 	"strconv"
 {{- end }}
 {{- if .TimeImport }}
@@ -46,7 +46,7 @@ func NewStrictHandler(ssi StrictServerInterface) *StrictHandler {
 {{ range .Operations }}
 // {{ .ID }} handles {{ .Method }} {{ .Path }}
 func (h *StrictHandler) {{ .ID }}(w http.ResponseWriter, r *http.Request) {
-{{- if or .PathParams .QueryParams .HeaderParams .QueryString .RequestBody }}
+{{- if or .PathParams .QueryParams .HeaderParams .CookieParams .QueryString .RequestBody }}
 	var request {{ .ID }}RequestObject
 {{- end }}
 {{- range .PathParams }}
@@ -191,6 +191,7 @@ func (h *StrictHandler) {{ .ID }}(w http.ResponseWriter, r *http.Request) {
 	}
 {{- end }}
 {{- end }}
+{{- template "cookieParams" dict "Echo" false "Writer" "w" "Target" "request" "Params" .CookieParams }}
 {{- if .QueryString }}
 	if err := decodeQueryString(r, &request.{{ .QueryString.GoName }}); err != nil {
 		http.Error(w, "invalid querystring", http.StatusBadRequest)
@@ -209,7 +210,7 @@ func (h *StrictHandler) {{ .ID }}(w http.ResponseWriter, r *http.Request) {
 	}{{ end }}
 {{- end }}
 
-	response, err := h.ssi.{{ .ID }}(r.Context(){{ if or .PathParams .QueryParams .HeaderParams .QueryString .RequestBody }}, request{{ end }})
+	response, err := h.ssi.{{ .ID }}(r.Context(){{ if or .PathParams .QueryParams .HeaderParams .CookieParams .QueryString .RequestBody }}, request{{ end }})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -22,7 +22,8 @@ var (
 // validate rejects spec strings that would be copied into generated Go source
 // in a form that changes its meaning: a quote, backtick or backslash ending a
 // string literal or struct tag, a newline ending a line comment, or an
-// extension that is not the Go identifier or type it claims to be.
+// extension that is not the Go identifier or type it claims to be. It also
+// rejects cookie parameters the generated code cannot bind.
 func validate(spec *model.Spec) error {
 	v := &validator{seen: map[*model.Schema]bool{}}
 	for i := range spec.Schemas {
@@ -37,6 +38,9 @@ func validate(spec *model.Spec) error {
 		v.noControl(op.Summary, "summary in "+where)
 		for _, p := range op.Parameters {
 			v.literal(p.Name, "parameter name in "+where)
+			if p.In == model.LocationCookie && !isScalarCookie(spec, p.Schema) {
+				v.fail("cookie parameter %q in %s: only strings, numbers, booleans and string enums can be cookie parameters", p.Name, where)
+			}
 			v.schema(p.Schema, fmt.Sprintf("parameter %q in %s", p.Name, where))
 		}
 		if op.RequestBody != nil {
@@ -184,4 +188,20 @@ func isGoType(s string) bool {
 		return ok
 	})
 	return ok
+}
+
+func isScalarCookie(spec *model.Spec, s *model.Schema) bool {
+	if s != nil && s.Type == "" && s.Ref != "" {
+		s = spec.SchemaByRef(s.Ref)
+	}
+	if s == nil || len(s.AllOf)+len(s.OneOf)+len(s.AnyOf) > 0 || (s.Extensions != nil && s.Extensions.GoType != "") {
+		return false
+	}
+	switch s.Type {
+	case model.TypeString:
+		return s.Format != "byte" && s.Format != "binary"
+	case model.TypeInteger, model.TypeNumber, model.TypeBoolean:
+		return len(s.Enum) == 0
+	}
+	return false
 }

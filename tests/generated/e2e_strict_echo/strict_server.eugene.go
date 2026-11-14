@@ -153,8 +153,28 @@ func (h *StrictEchoHandler) DeleteResource(ctx echo.Context) error {
 
 // GetSession handles GET /session
 func (h *StrictEchoHandler) GetSession(ctx echo.Context) error {
+	var request GetSessionRequestObject
+	if c, err := ctx.Cookie("session_id"); err == nil {
+		request.SessionID = c.Value
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing session_id")
+	}
+	if c, err := ctx.Cookie("status"); err == nil {
+		typed := Status(c.Value)
+		if !typed.IsValid() {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
+		}
+		request.Status = &typed
+	}
+	if c, err := ctx.Cookie("visits"); err == nil {
+		parsed, err := strconv.Atoi(c.Value)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid visits")
+		}
+		request.Visits = &parsed
+	}
 
-	response, err := h.ssi.GetSession(ctx.Request().Context())
+	response, err := h.ssi.GetSession(ctx.Request().Context(), request)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/kolah/eugene/v2/internal/golang"
@@ -45,6 +46,7 @@ type operationData struct {
 	PathParams       []parameterData
 	QueryParams      []parameterData
 	HeaderParams     []parameterData
+	CookieParams     []parameterData
 	QueryStringParam *parameterData
 	RequestBody      *requestBodyData
 	Responses        []responseData
@@ -55,6 +57,7 @@ type operationData struct {
 	HasPathParams    bool
 	HasQueryParams   bool
 	HasHeaderParams  bool
+	HasCookieParams  bool
 	HasQueryString   bool
 	HasBody          bool
 	IsStreaming      bool
@@ -156,10 +159,15 @@ func (t *Target) Generate(engine templates.Engine, spec *model.Spec, pkg string)
 			case model.LocationHeader:
 				opData.HeaderParams = append(opData.HeaderParams, pd)
 				opData.HasHeaderParams = true
+			case model.LocationCookie:
+				opData.CookieParams = append(opData.CookieParams, pd)
+				opData.HasCookieParams = true
 			case model.LocationQueryString:
 				// OpenAPI 3.2: querystring parameter - entire query as single object
 				opData.QueryStringParam = &pd
 				opData.HasQueryString = true
+			default:
+				return "", fmt.Errorf("operation %q: parameter %q is in %q, which the client cannot send", op.ID, p.Name, p.In)
 			}
 		}
 

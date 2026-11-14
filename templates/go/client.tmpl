@@ -303,7 +303,7 @@ type {{ .RequestTypeName }} struct {
 {{ range .Operations }}
 {{- if .IsStreaming }}
 {{ if .Summary }}// {{ .ID | pascalCase }} - {{ .Summary }} (streaming){{ end }}
-func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ if .HasBody }}, body {{ .RequestBody.Type }}{{ end }}{{ if or .HasQueryParams .HasHeaderParams }}, params *{{ .ParamsTypeName }}{{ end }}{{ if .HasQueryString }}, query *{{ .QueryStringParam.Type }}{{ end }}) (*EventStream, error) {
+func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ if .HasBody }}, body {{ .RequestBody.Type }}{{ end }}{{ if or .HasQueryParams .HasHeaderParams .HasCookieParams }}, params *{{ .ParamsTypeName }}{{ end }}{{ if .HasQueryString }}, query *{{ .QueryStringParam.Type }}{{ end }}) (*EventStream, error) {
 	path := "{{ .Path }}"
 {{- range .PathParams }}
 	path = strings.Replace(path, "{{"{"}}{{ .Name }}{{"}"}}", fmt.Sprint({{ .GoName | lower }}), 1)
@@ -340,7 +340,7 @@ func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams 
 		path += "?" + encodeQueryString(query)
 	}
 {{- end }}
-{{- if .HasHeaderParams }}
+{{- if or .HasHeaderParams .HasCookieParams }}
 	header := http.Header{}
 {{- range .HeaderParams }}
 {{- if .Required }}
@@ -353,12 +353,29 @@ func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams 
 	}
 {{- end }}
 {{- end }}
+{{- if .HasCookieParams }}
+	var cookies []string
+{{- range .CookieParams }}
+{{- if .Required }}
+	if params != nil {
+		cookies = append(cookies, (&http.Cookie{Name: "{{ .Name }}", Value: fmt.Sprint(params.{{ .GoName }})}).String())
+	}
+{{- else }}
+	if params != nil && params.{{ .GoName }} != nil {
+		cookies = append(cookies, (&http.Cookie{Name: "{{ .Name }}", Value: fmt.Sprint(*params.{{ .GoName }})}).String())
+	}
 {{- end }}
-	return doStreamRequest(ctx, c, "{{ .Method }}", path{{ if .HasBody }}, body{{ else }}, nil{{ end }}{{ if .HasHeaderParams }}, header{{ else }}, nil{{ end }})
+{{- end }}
+	if len(cookies) > 0 {
+		header.Set("Cookie", strings.Join(cookies, "; "))
+	}
+{{- end }}
+{{- end }}
+	return doStreamRequest(ctx, c, "{{ .Method }}", path{{ if .HasBody }}, body{{ else }}, nil{{ end }}{{ if or .HasHeaderParams .HasCookieParams }}, header{{ else }}, nil{{ end }})
 }
 {{- else }}
 {{ if .Summary }}// {{ .ID | pascalCase }} - {{ .Summary }}{{ end }}
-func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ if and .HasBody (not .IsMultipart) (not .IsFormUrlEncoded) }}, body {{ .RequestBody.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .RequestTypeName }}{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .RequestTypeName }}{{ end }}{{ if or .HasQueryParams .HasHeaderParams }}, params *{{ .ParamsTypeName }}{{ end }}{{ if .HasQueryString }}, query *{{ .QueryStringParam.Type }}{{ end }}) (*{{ .ResponseTypeName }}, error) {
+func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams }}, {{ .GoName | lower }} {{ .Type }}{{ end }}{{ if and .HasBody (not .IsMultipart) (not .IsFormUrlEncoded) }}, body {{ .RequestBody.Type }}{{ end }}{{ if .IsMultipart }}, req {{ .RequestTypeName }}{{ end }}{{ if .IsFormUrlEncoded }}, req {{ .RequestTypeName }}{{ end }}{{ if or .HasQueryParams .HasHeaderParams .HasCookieParams }}, params *{{ .ParamsTypeName }}{{ end }}{{ if .HasQueryString }}, query *{{ .QueryStringParam.Type }}{{ end }}) (*{{ .ResponseTypeName }}, error) {
 	path := "{{ .Path }}"
 {{- range .PathParams }}
 	path = strings.Replace(path, "{{"{"}}{{ .Name }}{{"}"}}", fmt.Sprint({{ .GoName | lower }}), 1)
@@ -492,6 +509,17 @@ func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams 
 	}
 {{- end }}
 {{- end }}
+{{- range .CookieParams }}
+{{- if .Required }}
+	if params != nil {
+		httpReq.AddCookie(&http.Cookie{Name: "{{ .Name }}", Value: fmt.Sprint(params.{{ .GoName }})})
+	}
+{{- else }}
+	if params != nil && params.{{ .GoName }} != nil {
+		httpReq.AddCookie(&http.Cookie{Name: "{{ .Name }}", Value: fmt.Sprint(*params.{{ .GoName }})})
+	}
+{{- end }}
+{{- end }}
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -546,7 +574,7 @@ func (c *Client) {{ .ID | pascalCase }}(ctx context.Context{{ range .PathParams 
 {{- end }}
 {{ end }}
 {{- range .Operations }}
-{{- if or .HasQueryParams .HasHeaderParams }}
+{{- if or .HasQueryParams .HasHeaderParams .HasCookieParams }}
 
 type {{ .ParamsTypeName }} struct {
 {{- range .QueryParams }}
@@ -557,6 +585,13 @@ type {{ .ParamsTypeName }} struct {
 {{- end }}
 {{- end }}
 {{- range .HeaderParams }}
+{{- if .Required }}
+	{{ .GoName }} {{ .Type }}
+{{- else }}
+	{{ .GoName }} *{{ .Type }}
+{{- end }}
+{{- end }}
+{{- range .CookieParams }}
 {{- if .Required }}
 	{{ .GoName }} {{ .Type }}
 {{- else }}

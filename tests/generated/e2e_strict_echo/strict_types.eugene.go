@@ -48,6 +48,13 @@ type DeleteResourceRequestObject struct {
 	ID string // path parameter
 }
 
+// GetSessionRequestObject represents the request for GetSession.
+type GetSessionRequestObject struct {
+	SessionID string  // cookie parameter
+	Status    *Status // cookie parameter
+	Visits    *int    // cookie parameter
+}
+
 // GetWhoamiRequestObject represents the request for GetWhoami.
 type GetWhoamiRequestObject struct {
 	XUserID   string // header parameter
@@ -247,7 +254,7 @@ type StrictServerInterface interface {
 	// DeleteResource
 	DeleteResource(ctx context.Context, request DeleteResourceRequestObject) (DeleteResourceResponseObject, error)
 	// GetSession
-	GetSession(ctx context.Context) (GetSessionResponseObject, error)
+	GetSession(ctx context.Context, request GetSessionRequestObject) (GetSessionResponseObject, error)
 	// GetWhoami
 	GetWhoami(ctx context.Context, request GetWhoamiRequestObject) (GetWhoamiResponseObject, error)
 	// GetSecureData

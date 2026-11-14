@@ -175,6 +175,14 @@ paths:
           required: true
           schema:
             type: string
+        - name: status
+          in: cookie
+          schema:
+            $ref: "#/components/schemas/Status"
+        - name: visits
+          in: cookie
+          schema:
+            type: integer
       responses:
         "200":
           description: Session info
@@ -210,6 +218,7 @@ paths:
       operationId: getSecureData
       security:
         - apiKey: []
+        - sessionCookie: []
       responses:
         "200":
           description: Secure data
@@ -247,6 +256,10 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: sid
 
   schemas:
     EchoPayload:
@@ -349,6 +362,10 @@ components:
           type: string
         expiresAt:
           type: string
+        status:
+          $ref: "#/components/schemas/Status"
+        visits:
+          type: integer
 
     SecureData:
       type: object

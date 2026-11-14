@@ -4,6 +4,7 @@ package gen
 import (
 	"mime/multipart"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
@@ -37,6 +38,12 @@ type GetDayHeaderParams struct {
 	XUntil *string `header:"X-Until"`
 }
 
+type GetSessionCookieParams struct {
+	SessionID string
+	Status    *Status
+	Visits    *int
+}
+
 type GetWhoamiHeaderParams struct {
 	XUserID   string `header:"X-User-ID"`
 	XTenantID int    `header:"X-Tenant-ID"`
@@ -58,7 +65,7 @@ type ServerInterface interface {
 	// DeleteResource
 	DeleteResource(ctx echo.Context, id string) error
 	// GetSession
-	GetSession(ctx echo.Context) error
+	GetSession(ctx echo.Context, cookies GetSessionCookieParams) error
 	// GetWhoami
 	GetWhoami(ctx echo.Context, headers GetWhoamiHeaderParams) error
 	// GetSecureData
@@ -134,7 +141,27 @@ func (w *ServerInterfaceWrapper) DeleteResource(ctx echo.Context) error {
 }
 
 func (w *ServerInterfaceWrapper) GetSession(ctx echo.Context) error {
-	return w.Handler.GetSession(ctx)
+	var cookies GetSessionCookieParams
+	if c, err := ctx.Cookie("session_id"); err == nil {
+		cookies.SessionID = c.Value
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing session_id")
+	}
+	if c, err := ctx.Cookie("status"); err == nil {
+		typed := Status(c.Value)
+		if !typed.IsValid() {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
+		}
+		cookies.Status = &typed
+	}
+	if c, err := ctx.Cookie("visits"); err == nil {
+		parsed, err := strconv.Atoi(c.Value)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid visits")
+		}
+		cookies.Visits = &parsed
+	}
+	return w.Handler.GetSession(ctx, cookies)
 }
 
 func (w *ServerInterfaceWrapper) GetWhoami(ctx echo.Context) error {

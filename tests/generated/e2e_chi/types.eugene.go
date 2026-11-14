@@ -59,6 +59,8 @@ type SessionInfo struct {
 	SessionID *string `json:"sessionId,omitempty"`
 	UserID    *string `json:"userId,omitempty"`
 	ExpiresAt *string `json:"expiresAt,omitempty"`
+	Status    *Status `json:"status,omitempty"`
+	Visits    *int    `json:"visits,omitempty"`
 }
 
 type SecureData struct {

@@ -595,7 +595,7 @@ func (c *Client) DeleteResource(ctx context.Context, id string) (*DeleteResource
 	return result, nil
 }
 
-func (c *Client) GetSession(ctx context.Context) (*GetSessionResponse, error) {
+func (c *Client) GetSession(ctx context.Context, params *GetSessionParams) (*GetSessionResponse, error) {
 	path := "/session"
 
 	var bodyReader io.Reader
@@ -605,6 +605,15 @@ func (c *Client) GetSession(ctx context.Context) (*GetSessionResponse, error) {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 	httpReq.Header.Set("Accept", "application/json")
+	if params != nil {
+		httpReq.AddCookie(&http.Cookie{Name: "session_id", Value: fmt.Sprint(params.SessionID)})
+	}
+	if params != nil && params.Status != nil {
+		httpReq.AddCookie(&http.Cookie{Name: "status", Value: fmt.Sprint(*params.Status)})
+	}
+	if params != nil && params.Visits != nil {
+		httpReq.AddCookie(&http.Cookie{Name: "visits", Value: fmt.Sprint(*params.Visits)})
+	}
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -809,6 +818,12 @@ type GetItemParams struct {
 type GetDayParams struct {
 	Since  *string
 	XUntil *string
+}
+
+type GetSessionParams struct {
+	SessionID string
+	Status    *Status
+	Visits    *int
 }
 
 type GetWhoamiParams struct {

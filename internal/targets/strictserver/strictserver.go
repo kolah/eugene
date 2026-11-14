@@ -42,6 +42,7 @@ type templateData struct {
 	Framework      string
 	HasQueryParams bool
 	HasHeaderParams bool
+	HasCookieParams bool
 	HasQueryString bool // OpenAPI 3.2: any operation uses in: querystring
 	UUIDImport     string
 	TimeImport     bool
@@ -62,6 +63,7 @@ type operationData struct {
 	PathParams     []parameterData
 	QueryParams    []parameterData
 	HeaderParams   []parameterData
+	CookieParams   []parameterData
 	QueryString    *querystringData // OpenAPI 3.2: in: querystring
 	HasQueryString bool
 	RequestBody    *requestBodyData
@@ -95,20 +97,27 @@ type responseData struct {
 }
 
 func (t *Target) GenerateTypes(engine templates.Engine, spec *model.Spec, pkg string, cfg *config.TypesConfig, registry *golang.EnumRegistry) (string, error) {
-	data := t.buildTemplateData(spec, pkg, cfg, registry)
+	data, err := t.buildTemplateData(spec, pkg, cfg, registry)
+	if err != nil {
+		return "", err
+	}
 	return engine.Execute(t.framework.TypesTemplateName(), data)
 }
 
 func (t *Target) GenerateAdapter(engine templates.Engine, spec *model.Spec, pkg string, cfg *config.TypesConfig, registry *golang.EnumRegistry) (string, error) {
-	data := t.buildTemplateData(spec, pkg, cfg, registry)
+	data, err := t.buildTemplateData(spec, pkg, cfg, registry)
+	if err != nil {
+		return "", err
+	}
 	return engine.Execute(t.framework.AdapterTemplateName(), data)
 }
 
-func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.TypesConfig, registry *golang.EnumRegistry) templateData {
+func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.TypesConfig, registry *golang.EnumRegistry) (templateData, error) {
 	resolver := golang.NewTypeResolverWithRegistry(cfg, nil, registry)
 	var ops []operationData
 	hasQueryParams := false
 	hasHeaderParams := false
+	hasCookieParams := false
 	hasQueryString := false
 	timeImport := false
 
@@ -145,6 +154,9 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 			case model.LocationHeader:
 				opData.HeaderParams = append(opData.HeaderParams, pd)
 				hasHeaderParams = true
+			case model.LocationCookie:
+				opData.CookieParams = append(opData.CookieParams, pd)
+				hasCookieParams = true
 			case model.LocationQueryString:
 				opData.QueryString = &querystringData{
 					Name:   p.Name,
@@ -153,6 +165,8 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 				}
 				opData.HasQueryString = true
 				hasQueryString = true
+			default:
+				return templateData{}, fmt.Errorf("operation %q: parameter %q is in %q, which the strict server cannot bind", op.ID, p.Name, p.In)
 			}
 		}
 
@@ -200,11 +214,12 @@ func (t *Target) buildTemplateData(spec *model.Spec, pkg string, cfg *config.Typ
 		Framework:      t.framework.Name(),
 		HasQueryParams: hasQueryParams,
 		HasHeaderParams: hasHeaderParams,
+		HasCookieParams: hasCookieParams,
 		HasQueryString: hasQueryString,
 		UUIDImport:     resolver.UUIDImport(),
 		TimeImport:     timeImport,
 		InlineEnums:    inlineEnums,
-	}
+	}, nil
 }
 
 

@@ -16,9 +16,13 @@ type GetItemHeaderParams struct {
 	XRequestID *string `header:"X-Request-ID"`
 }
 
+type GetItemCookieParams struct {
+	Session *string
+}
+
 type ServerInterface interface {
 	// GetItem
-	GetItem(ctx echo.Context, id string, params GetItemQueryParams, headers GetItemHeaderParams) error
+	GetItem(ctx echo.Context, id string, params GetItemQueryParams, headers GetItemHeaderParams, cookies GetItemCookieParams) error
 }
 
 type ServerInterfaceWrapper struct {
@@ -35,7 +39,11 @@ func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
 	}
-	return w.Handler.GetItem(ctx, id, params, headers)
+	var cookies GetItemCookieParams
+	if c, err := ctx.Cookie("session"); err == nil {
+		cookies.Session = &c.Value
+	}
+	return w.Handler.GetItem(ctx, id, params, headers, cookies)
 }
 
 func RegisterHandlers(router Router, si ServerInterface) {

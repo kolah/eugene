@@ -33,28 +33,38 @@ func decodeQueryString(r *http.Request, v any) error {
 	return json.Unmarshal(b, v)
 }
 {{- end }}
+{{- template "requestErrorType" false }}
 
 // StrictOptions configures a strict handler.
 type StrictOptions struct {
 	// ErrorHandler writes the response when an operation returns an error or its
 	// response cannot be written. The default sends a bare 500 without the error.
 	ErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+	// RequestErrorHandler answers requests rejected before the operation runs,
+	// with err a *RequestError. The default sends a 400 with err.Error().
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // StrictHandler wraps a StrictServerInterface to handle stdlib requests.
 type StrictHandler struct {
-	ssi          StrictServerInterface
-	errorHandler func(w http.ResponseWriter, r *http.Request, err error)
+	ssi                 StrictServerInterface
+	errorHandler        func(w http.ResponseWriter, r *http.Request, err error)
+	requestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // NewStrictHandler creates a new StrictHandler.
 func NewStrictHandler(ssi StrictServerInterface, opts ...StrictOptions) *StrictHandler {
 	h := &StrictHandler{ssi: ssi, errorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}, requestErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}}
 	for _, o := range opts {
 		if o.ErrorHandler != nil {
 			h.errorHandler = o.ErrorHandler
+		}
+		if o.RequestErrorHandler != nil {
+			h.requestErrorHandler = o.RequestErrorHandler
 		}
 	}
 	return h
@@ -68,69 +78,35 @@ func (h *StrictHandler) {{ .ID }}(w http.ResponseWriter, r *http.Request) {
 {{- range .PathParams }}
 {{- if eq .Type "uuid.UUID" }}
 	if err := request.{{ .GoName }}.UnmarshalText([]byte(r.PathValue("{{ .Name }}"))); err != nil {
-		http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
-		return
+{{- template "reject" dict "Echo" false "Writer" "w" "Handler" "h.requestErrorHandler" "In" "path" "Name" .Name "Reason" "invalid" "Err" "err" }}
 	}
 {{- else if .IsEnum }}
 	request.{{ .GoName }} = {{ .Type }}(r.PathValue("{{ .Name }}"))
 	if !request.{{ .GoName }}.IsValid() {
-		http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
-		return
+{{- template "reject" dict "Echo" false "Writer" "w" "Handler" "h.requestErrorHandler" "In" "path" "Name" .Name "Reason" "invalid" "Err" "" }}
 	}
 {{- else }}
 	request.{{ .GoName }} = r.PathValue("{{ .Name }}")
 {{- end }}
 {{- end }}
 {{- range .QueryParams }}
-{{- if .IsEnumArray }}
-	if values := r.URL.Query()["{{ .Name }}"]; len(values) > 0 {
-		typed := make({{ .Type }}, len(values))
-		for i, v := range values {
-			typed[i] = {{ trimPrefix .Type "[]" }}(v)
-			if !typed[i].IsValid() {
-				http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
-				return
-			}
-		}
-		{{ if .Required }}request.{{ .GoName }} = typed{{ else }}request.{{ .GoName }} = &typed{{ end }}
-	}{{ if .Required }} else {
-{{- template "paramError" dict "Echo" false "Writer" "w" "Message" (printf "missing %s" .Name) }}
-	}{{ end }}
-{{- else if hasPrefix .Type "[]" }}
-	if values := r.URL.Query()["{{ .Name }}"]; len(values) > 0 {
-		{{ if .Required }}request.{{ .GoName }} = values{{ else }}request.{{ .GoName }} = &values{{ end }}
-	}{{ if .Required }} else {
-{{- template "paramError" dict "Echo" false "Writer" "w" "Message" (printf "missing %s" .Name) }}
-	}{{ end }}
-{{- else }}
-{{- template "scalarParam" dict "Source" "query" "Echo" false "Writer" "w" "Target" "request" "Param" . }}
-{{- end }}
+{{- template "param" dict "Source" "query" "Echo" false "Writer" "w" "Handler" "h.requestErrorHandler" "Target" "request" "Param" . }}
 {{- end }}
 {{- range .HeaderParams }}
-{{- if hasPrefix .Type "[]" }}
-	if values := r.Header.Values("{{ .Name }}"); len(values) > 0 {
-		{{ if .Required }}request.{{ .GoName }} = values{{ else }}request.{{ .GoName }} = &values{{ end }}
-	}{{ if .Required }} else {
-{{- template "paramError" dict "Echo" false "Writer" "w" "Message" (printf "missing %s" .Name) }}
-	}{{ end }}
-{{- else }}
-{{- template "scalarParam" dict "Source" "header" "Echo" false "Writer" "w" "Target" "request" "Param" . }}
-{{- end }}
+{{- template "param" dict "Source" "header" "Echo" false "Writer" "w" "Handler" "h.requestErrorHandler" "Target" "request" "Param" . }}
 {{- end }}
 {{- range .CookieParams }}
-{{- template "scalarParam" dict "Source" "cookie" "Echo" false "Writer" "w" "Target" "request" "Param" . }}
+{{- template "param" dict "Source" "cookie" "Echo" false "Writer" "w" "Handler" "h.requestErrorHandler" "Target" "request" "Param" . }}
 {{- end }}
 {{- if .QueryString }}
 	if err := decodeQueryString(r, &request.{{ .QueryString.GoName }}); err != nil {
-		http.Error(w, "invalid querystring", http.StatusBadRequest)
-		return
+{{- template "reject" dict "Echo" false "Writer" "w" "Handler" "h.requestErrorHandler" "In" "querystring" "Name" .QueryString.Name "Reason" "invalid" "Err" "err" }}
 	}
 {{- end }}
 {{- if .RequestBody }}
 	{{ if .RequestBody.Required }}var body {{ .RequestBody.Type }}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+{{- template "reject" dict "Echo" false "Writer" "w" "Handler" "h.requestErrorHandler" "In" "body" "Name" "" "Reason" "invalid" "Err" "err" }}
 	}
 	request.Body = body{{ else }}var body {{ .RequestBody.Type }}
 	if err := json.NewDecoder(r.Body).Decode(&body); err == nil {

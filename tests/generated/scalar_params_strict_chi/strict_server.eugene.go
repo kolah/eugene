@@ -10,27 +10,72 @@ import (
 	"github.com/gofrs/uuid/v5"
 )
 
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
 // StrictOptions configures a strict handler.
 type StrictOptions struct {
 	// ErrorHandler writes the response when an operation returns an error or its
 	// response cannot be written. The default sends a bare 500 without the error.
 	ErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+	// RequestErrorHandler answers requests rejected before the operation runs,
+	// with err a *RequestError. The default sends a 400 with err.Error().
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // StrictChiHandler wraps a StrictServerInterface to handle Chi requests.
 type StrictChiHandler struct {
-	ssi          StrictServerInterface
-	errorHandler func(w http.ResponseWriter, r *http.Request, err error)
+	ssi                 StrictServerInterface
+	errorHandler        func(w http.ResponseWriter, r *http.Request, err error)
+	requestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // NewStrictHandler creates a new StrictChiHandler.
 func NewStrictHandler(ssi StrictServerInterface, opts ...StrictOptions) *StrictChiHandler {
 	h := &StrictChiHandler{ssi: ssi, errorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}, requestErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}}
 	for _, o := range opts {
 		if o.ErrorHandler != nil {
 			h.errorHandler = o.ErrorHandler
+		}
+		if o.RequestErrorHandler != nil {
+			h.requestErrorHandler = o.RequestErrorHandler
 		}
 	}
 	return h
@@ -42,13 +87,13 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("q_sid"); v != "" {
 		request.QSid = v
 	} else {
-		http.Error(w, "missing q_sid", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_sid", Reason: "missing"})
 		return
 	}
 	if v := r.URL.Query().Get("q_count"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			http.Error(w, "invalid q_count", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_count", Reason: "invalid", Err: err})
 			return
 		}
 		request.QCount = &parsed
@@ -57,18 +102,18 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		parsed64, err := strconv.ParseInt(v, 10, 32)
 		parsed := int32(parsed64)
 		if err != nil {
-			http.Error(w, "invalid q_count32", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_count32", Reason: "invalid", Err: err})
 			return
 		}
 		request.QCount32 = parsed
 	} else {
-		http.Error(w, "missing q_count32", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_count32", Reason: "missing"})
 		return
 	}
 	if v := r.URL.Query().Get("q_count64"); v != "" {
 		parsed, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			http.Error(w, "invalid q_count64", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_count64", Reason: "invalid", Err: err})
 			return
 		}
 		request.QCount64 = &parsed
@@ -76,7 +121,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("q_ratio"); v != "" {
 		parsed, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			http.Error(w, "invalid q_ratio", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_ratio", Reason: "invalid", Err: err})
 			return
 		}
 		request.QRatio = &parsed
@@ -84,7 +129,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("q_beta"); v != "" {
 		parsed, err := strconv.ParseBool(v)
 		if err != nil {
-			http.Error(w, "invalid q_beta", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_beta", Reason: "invalid", Err: err})
 			return
 		}
 		request.QBeta = &parsed
@@ -93,7 +138,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		var parsed uuid.UUID
 		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
-			http.Error(w, "invalid q_device", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_device", Reason: "invalid", Err: err})
 			return
 		}
 		request.QDevice = &parsed
@@ -101,7 +146,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("q_since"); v != "" {
 		parsed, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			http.Error(w, "invalid q_since", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_since", Reason: "invalid", Err: err})
 			return
 		}
 		request.QSince = &parsed
@@ -109,7 +154,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("q_theme"); v != "" {
 		typed := Theme(v)
 		if !typed.IsValid() {
-			http.Error(w, "invalid q_theme", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_theme", Reason: "invalid"})
 			return
 		}
 		request.QTheme = &typed
@@ -117,12 +162,12 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("q_mode"); v != "" {
 		typed := XMode(v)
 		if !typed.IsValid() {
-			http.Error(w, "invalid q_mode", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_mode", Reason: "invalid"})
 			return
 		}
 		request.QMode = typed
 	} else {
-		http.Error(w, "missing q_mode", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_mode", Reason: "missing"})
 		return
 	}
 	if v := r.URL.Query().Get("q_token"); v != "" {
@@ -132,7 +177,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if values := r.URL.Query()["q_tags"]; len(values) > 0 {
 		request.QTags = values
 	} else {
-		http.Error(w, "missing q_tags", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_tags", Reason: "missing"})
 		return
 	}
 	if values := r.URL.Query()["q_themes"]; len(values) > 0 {
@@ -140,7 +185,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		for i, v := range values {
 			typed[i] = Theme(v)
 			if !typed[i].IsValid() {
-				http.Error(w, "invalid q_themes", http.StatusBadRequest)
+				h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "q_themes", Reason: "invalid"})
 				return
 			}
 		}
@@ -149,13 +194,13 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.Header.Get("X-Sid"); v != "" {
 		request.XSid = v
 	} else {
-		http.Error(w, "missing X-Sid", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Sid", Reason: "missing"})
 		return
 	}
 	if v := r.Header.Get("X-Count"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			http.Error(w, "invalid X-Count", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Count", Reason: "invalid", Err: err})
 			return
 		}
 		request.XCount = &parsed
@@ -164,18 +209,18 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		parsed64, err := strconv.ParseInt(v, 10, 32)
 		parsed := int32(parsed64)
 		if err != nil {
-			http.Error(w, "invalid X-Count32", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Count32", Reason: "invalid", Err: err})
 			return
 		}
 		request.XCount32 = parsed
 	} else {
-		http.Error(w, "missing X-Count32", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Count32", Reason: "missing"})
 		return
 	}
 	if v := r.Header.Get("X-Count64"); v != "" {
 		parsed, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			http.Error(w, "invalid X-Count64", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Count64", Reason: "invalid", Err: err})
 			return
 		}
 		request.XCount64 = &parsed
@@ -183,7 +228,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.Header.Get("X-Ratio"); v != "" {
 		parsed, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			http.Error(w, "invalid X-Ratio", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Ratio", Reason: "invalid", Err: err})
 			return
 		}
 		request.XRatio = &parsed
@@ -191,7 +236,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.Header.Get("X-Beta"); v != "" {
 		parsed, err := strconv.ParseBool(v)
 		if err != nil {
-			http.Error(w, "invalid X-Beta", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Beta", Reason: "invalid", Err: err})
 			return
 		}
 		request.XBeta = &parsed
@@ -200,7 +245,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		var parsed uuid.UUID
 		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
-			http.Error(w, "invalid X-Device", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Device", Reason: "invalid", Err: err})
 			return
 		}
 		request.XDevice = &parsed
@@ -208,7 +253,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.Header.Get("X-Since"); v != "" {
 		parsed, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			http.Error(w, "invalid X-Since", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Since", Reason: "invalid", Err: err})
 			return
 		}
 		request.XSince = &parsed
@@ -216,7 +261,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.Header.Get("X-Theme"); v != "" {
 		typed := Theme(v)
 		if !typed.IsValid() {
-			http.Error(w, "invalid X-Theme", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Theme", Reason: "invalid"})
 			return
 		}
 		request.XTheme = &typed
@@ -224,7 +269,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if v := r.Header.Get("X-Mode"); v != "" {
 		typed := XMode(v)
 		if !typed.IsValid() {
-			http.Error(w, "invalid X-Mode", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Mode", Reason: "invalid"})
 			return
 		}
 		request.XMode = &typed
@@ -236,19 +281,19 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if values := r.Header.Values("X-Tags"); len(values) > 0 {
 		request.XTags = values
 	} else {
-		http.Error(w, "missing X-Tags", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "header", Name: "X-Tags", Reason: "missing"})
 		return
 	}
 	if c, err := r.Cookie("sid"); err == nil {
 		request.Sid = c.Value
 	} else {
-		http.Error(w, "missing sid", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "sid", Reason: "missing"})
 		return
 	}
 	if c, err := r.Cookie("count"); err == nil {
 		parsed, err := strconv.Atoi(c.Value)
 		if err != nil {
-			http.Error(w, "invalid count", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "count", Reason: "invalid", Err: err})
 			return
 		}
 		request.Count = &parsed
@@ -257,18 +302,18 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		parsed64, err := strconv.ParseInt(c.Value, 10, 32)
 		parsed := int32(parsed64)
 		if err != nil {
-			http.Error(w, "invalid count32", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "count32", Reason: "invalid", Err: err})
 			return
 		}
 		request.Count32 = parsed
 	} else {
-		http.Error(w, "missing count32", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "count32", Reason: "missing"})
 		return
 	}
 	if c, err := r.Cookie("count64"); err == nil {
 		parsed, err := strconv.ParseInt(c.Value, 10, 64)
 		if err != nil {
-			http.Error(w, "invalid count64", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "count64", Reason: "invalid", Err: err})
 			return
 		}
 		request.Count64 = &parsed
@@ -276,7 +321,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie("ratio"); err == nil {
 		parsed, err := strconv.ParseFloat(c.Value, 64)
 		if err != nil {
-			http.Error(w, "invalid ratio", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "ratio", Reason: "invalid", Err: err})
 			return
 		}
 		request.Ratio = &parsed
@@ -284,7 +329,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie("beta"); err == nil {
 		parsed, err := strconv.ParseBool(c.Value)
 		if err != nil {
-			http.Error(w, "invalid beta", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "beta", Reason: "invalid", Err: err})
 			return
 		}
 		request.Beta = &parsed
@@ -293,7 +338,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		var parsed uuid.UUID
 		err := parsed.UnmarshalText([]byte(c.Value))
 		if err != nil {
-			http.Error(w, "invalid device", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "device", Reason: "invalid", Err: err})
 			return
 		}
 		request.Device = &parsed
@@ -301,7 +346,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie("since"); err == nil {
 		parsed, err := time.Parse(time.RFC3339, c.Value)
 		if err != nil {
-			http.Error(w, "invalid since", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "since", Reason: "invalid", Err: err})
 			return
 		}
 		request.Since = &parsed
@@ -309,7 +354,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie("theme"); err == nil {
 		typed := Theme(c.Value)
 		if !typed.IsValid() {
-			http.Error(w, "invalid theme", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "theme", Reason: "invalid"})
 			return
 		}
 		request.Theme = &typed
@@ -317,7 +362,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie("mode"); err == nil {
 		typed := XMode(c.Value)
 		if !typed.IsValid() {
-			http.Error(w, "invalid mode", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "mode", Reason: "invalid"})
 			return
 		}
 		request.Mode = &typed
@@ -342,7 +387,7 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 func (h *StrictChiHandler) GetDevice(w http.ResponseWriter, r *http.Request) {
 	var request GetDeviceRequestObject
 	if err := request.ID.UnmarshalText([]byte(chi.URLParam(r, "id"))); err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "path", Name: "id", Reason: "invalid", Err: err})
 		return
 	}
 
@@ -363,13 +408,13 @@ func (h *StrictChiHandler) StreamEvents(w http.ResponseWriter, r *http.Request) 
 	if c, err := r.Cookie("sid"); err == nil {
 		request.Sid = c.Value
 	} else {
-		http.Error(w, "missing sid", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "sid", Reason: "missing"})
 		return
 	}
 	if c, err := r.Cookie("since"); err == nil {
 		parsed, err := time.Parse(time.RFC3339, c.Value)
 		if err != nil {
-			http.Error(w, "invalid since", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "cookie", Name: "since", Reason: "invalid", Err: err})
 			return
 		}
 		request.Since = &parsed

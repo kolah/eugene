@@ -35,6 +35,42 @@ type ListLegacyLinksQueryParams struct {
 	Scopes *[]LinkScope
 }
 
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
 type ServerInterface interface {
 	// ListItems
 	ListItems(w http.ResponseWriter, r *http.Request, params ListItemsQueryParams)
@@ -54,6 +90,17 @@ type ServerInterface interface {
 
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+	// RequestErrorHandler answers requests rejected before the operation runs,
+	// with err a *RequestError. Nil sends a 400 with err.Error().
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+}
+
+func (w *ServerInterfaceWrapper) requestError(rw http.ResponseWriter, r *http.Request, err error) {
+	if w.RequestErrorHandler != nil {
+		w.RequestErrorHandler(rw, r, err)
+		return
+	}
+	http.Error(rw, err.Error(), http.StatusBadRequest)
 }
 
 func (w *ServerInterfaceWrapper) ListItems(rw http.ResponseWriter, r *http.Request) {
@@ -61,7 +108,7 @@ func (w *ServerInterfaceWrapper) ListItems(rw http.ResponseWriter, r *http.Reque
 	if v := r.URL.Query().Get("limit"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			http.Error(rw, "invalid limit", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "query", Name: "limit", Reason: "invalid", Err: err})
 			return
 		}
 		params.Limit = &parsed
@@ -90,7 +137,7 @@ func (w *ServerInterfaceWrapper) ListLegacyLinks(rw http.ResponseWriter, r *http
 	if values := r.URL.Query()["kinds"]; len(values) > 0 {
 		params.Kinds = values
 	} else {
-		http.Error(rw, "missing kinds", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "query", Name: "kinds", Reason: "missing"})
 		return
 	}
 	if values := r.URL.Query()["scopes"]; len(values) > 0 {
@@ -98,7 +145,7 @@ func (w *ServerInterfaceWrapper) ListLegacyLinks(rw http.ResponseWriter, r *http
 		for i, v := range values {
 			typed[i] = LinkScope(v)
 			if !typed[i].IsValid() {
-				http.Error(rw, "invalid scopes", http.StatusBadRequest)
+				w.requestError(rw, r, &RequestError{In: "query", Name: "scopes", Reason: "invalid"})
 				return
 			}
 		}
@@ -110,12 +157,12 @@ func (w *ServerInterfaceWrapper) ListLegacyLinks(rw http.ResponseWriter, r *http
 func (w *ServerInterfaceWrapper) GetLegacyLink(rw http.ResponseWriter, r *http.Request) {
 	kind := Kind(r.PathValue("kind"))
 	if !kind.IsValid() {
-		http.Error(rw, "invalid kind", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "path", Name: "kind", Reason: "invalid"})
 		return
 	}
 	scope := LinkScope(r.PathValue("scope"))
 	if !scope.IsValid() {
-		http.Error(rw, "invalid scope", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "path", Name: "scope", Reason: "invalid"})
 		return
 	}
 	w.Handler.GetLegacyLink(rw, r, kind, scope)
@@ -128,11 +175,13 @@ func Handler(si ServerInterface) http.Handler {
 type StdlibServerOptions struct {
 	BaseURL     string
 	Middlewares []func(http.Handler) http.Handler
+	// RequestErrorHandler is copied to ServerInterfaceWrapper.RequestErrorHandler.
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 func HandlerWithOptions(si ServerInterface, options StdlibServerOptions) http.Handler {
 	mux := http.NewServeMux()
-	wrapper := &ServerInterfaceWrapper{Handler: si}
+	wrapper := &ServerInterfaceWrapper{Handler: si, RequestErrorHandler: options.RequestErrorHandler}
 
 	mux.HandleFunc("GET "+options.BaseURL+"/items", wrapper.ListItems)
 	mux.HandleFunc("POST "+options.BaseURL+"/items", wrapper.CreateItem)

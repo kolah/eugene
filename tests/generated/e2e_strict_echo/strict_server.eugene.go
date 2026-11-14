@@ -9,6 +9,46 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
+func newRequestError(re *RequestError) error {
+	return echo.NewHTTPError(http.StatusBadRequest, re.Error()).SetInternal(re)
+}
+
 // StrictEchoHandler wraps a StrictServerInterface to handle Echo requests.
 type StrictEchoHandler struct {
 	ssi StrictServerInterface
@@ -24,7 +64,7 @@ func (h *StrictEchoHandler) EchoJSON(ctx echo.Context) error {
 	var request EchoJSONRequestObject
 	var body EchoPayload
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+		return newRequestError(&RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 	}
 	request.Body = body
 
@@ -41,7 +81,7 @@ func (h *StrictEchoHandler) EchoForm(ctx echo.Context) error {
 	var request EchoFormRequestObject
 	var body any
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+		return newRequestError(&RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 	}
 	request.Body = body
 
@@ -58,7 +98,7 @@ func (h *StrictEchoHandler) EchoMultipart(ctx echo.Context) error {
 	var request EchoMultipartRequestObject
 	var body any
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+		return newRequestError(&RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 	}
 	request.Body = body
 
@@ -80,7 +120,7 @@ func (h *StrictEchoHandler) GetItem(ctx echo.Context) error {
 	if v := ctx.QueryParam("limit"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid limit")
+			return newRequestError(&RequestError{In: "query", Name: "limit", Reason: "invalid", Err: err})
 		}
 		request.Limit = &parsed
 	}
@@ -90,7 +130,7 @@ func (h *StrictEchoHandler) GetItem(ctx echo.Context) error {
 	if v := ctx.Request().Header.Get("X-Retry-Count"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Retry-Count")
+			return newRequestError(&RequestError{In: "header", Name: "X-Retry-Count", Reason: "invalid", Err: err})
 		}
 		request.XRetryCount = &parsed
 	}
@@ -127,7 +167,7 @@ func (h *StrictEchoHandler) CreateResource(ctx echo.Context) error {
 	var request CreateResourceRequestObject
 	var body NewResource
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+		return newRequestError(&RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 	}
 	request.Body = body
 
@@ -158,19 +198,19 @@ func (h *StrictEchoHandler) GetSession(ctx echo.Context) error {
 	if c, err := ctx.Cookie("session_id"); err == nil {
 		request.SessionID = c.Value
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing session_id")
+		return newRequestError(&RequestError{In: "cookie", Name: "session_id", Reason: "missing"})
 	}
 	if c, err := ctx.Cookie("status"); err == nil {
 		typed := Status(c.Value)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
+			return newRequestError(&RequestError{In: "cookie", Name: "status", Reason: "invalid"})
 		}
 		request.Status = &typed
 	}
 	if c, err := ctx.Cookie("visits"); err == nil {
 		parsed, err := strconv.Atoi(c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid visits")
+			return newRequestError(&RequestError{In: "cookie", Name: "visits", Reason: "invalid", Err: err})
 		}
 		request.Visits = &parsed
 	}
@@ -189,28 +229,28 @@ func (h *StrictEchoHandler) GetWhoami(ctx echo.Context) error {
 	if v := ctx.Request().Header.Get("X-User-ID"); v != "" {
 		request.XUserID = v
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-User-ID")
+		return newRequestError(&RequestError{In: "header", Name: "X-User-ID", Reason: "missing"})
 	}
 	if v := ctx.Request().Header.Get("X-Tenant-ID"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Tenant-ID")
+			return newRequestError(&RequestError{In: "header", Name: "X-Tenant-ID", Reason: "invalid", Err: err})
 		}
 		request.XTenantID = parsed
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tenant-ID")
+		return newRequestError(&RequestError{In: "header", Name: "X-Tenant-ID", Reason: "missing"})
 	}
 	if v := ctx.Request().Header.Get("X-Status"); v != "" {
 		typed := Status(v)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Status")
+			return newRequestError(&RequestError{In: "header", Name: "X-Status", Reason: "invalid"})
 		}
 		request.XStatus = &typed
 	}
 	if v := ctx.Request().Header.Get("X-Since"); v != "" {
 		parsed, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Since")
+			return newRequestError(&RequestError{In: "header", Name: "X-Since", Reason: "invalid", Err: err})
 		}
 		request.XSince = &parsed
 	}
@@ -229,33 +269,33 @@ func (h *StrictEchoHandler) Search(ctx echo.Context) error {
 	if v := ctx.QueryParam("user"); v != "" {
 		request.User = v
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing user")
+		return newRequestError(&RequestError{In: "query", Name: "user", Reason: "missing"})
 	}
 	if v := ctx.QueryParam("tenant"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid tenant")
+			return newRequestError(&RequestError{In: "query", Name: "tenant", Reason: "invalid", Err: err})
 		}
 		request.Tenant = parsed
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing tenant")
+		return newRequestError(&RequestError{In: "query", Name: "tenant", Reason: "missing"})
 	}
 	if values := ctx.QueryParams()["tags"]; len(values) > 0 {
 		request.Tags = values
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing tags")
+		return newRequestError(&RequestError{In: "query", Name: "tags", Reason: "missing"})
 	}
 	if v := ctx.QueryParam("status"); v != "" {
 		typed := Status(v)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
+			return newRequestError(&RequestError{In: "query", Name: "status", Reason: "invalid"})
 		}
 		request.Status = &typed
 	}
 	if v := ctx.QueryParam("since"); v != "" {
 		parsed, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid since")
+			return newRequestError(&RequestError{In: "query", Name: "since", Reason: "invalid", Err: err})
 		}
 		request.Since = &parsed
 	}
@@ -284,7 +324,7 @@ func (h *StrictEchoHandler) CreateShape(ctx echo.Context) error {
 	var request CreateShapeRequestObject
 	var body Shape
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+		return newRequestError(&RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 	}
 	request.Body = body
 

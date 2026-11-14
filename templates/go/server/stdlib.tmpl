@@ -132,6 +132,7 @@ type {{ .ID | pascalCase }}CookieParams struct {
 }
 {{- end }}
 {{- end }}
+{{- template "requestErrorType" false }}
 
 type ServerInterface interface {
 {{- range .Operations }}
@@ -142,6 +143,17 @@ type ServerInterface interface {
 
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+	// RequestErrorHandler answers requests rejected before the operation runs,
+	// with err a *RequestError. Nil sends a 400 with err.Error().
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+}
+
+func (w *ServerInterfaceWrapper) requestError(rw http.ResponseWriter, r *http.Request, err error) {
+	if w.RequestErrorHandler != nil {
+		w.RequestErrorHandler(rw, r, err)
+		return
+	}
+	http.Error(rw, err.Error(), http.StatusBadRequest)
 }
 {{ range .Operations }}
 func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, r *http.Request) {
@@ -149,14 +161,12 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 {{- if eq .Type "uuid.UUID" }}
 	var {{ .GoName | camelCase }} uuid.UUID
 	if err := {{ .GoName | camelCase }}.UnmarshalText([]byte(r.PathValue("{{ .Name }}"))); err != nil {
-		http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-		return
+{{- template "reject" dict "Echo" false "Writer" "rw" "Handler" "w.requestError" "In" "path" "Name" .Name "Reason" "invalid" "Err" "err" }}
 	}
 {{- else if .IsEnum }}
 	{{ .GoName | camelCase }} := {{ .Type }}(r.PathValue("{{ .Name }}"))
 	if !{{ .GoName | camelCase }}.IsValid() {
-		http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-		return
+{{- template "reject" dict "Echo" false "Writer" "rw" "Handler" "w.requestError" "In" "path" "Name" .Name "Reason" "invalid" "Err" "" }}
 	}
 {{- else }}
 	{{ .GoName | camelCase }} := r.PathValue("{{ .Name }}")
@@ -165,63 +175,31 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 {{- if .HasQueryParams }}
 	var params {{ .ID | pascalCase }}QueryParams
 {{- range .QueryParams }}
-{{- if .IsEnumArray }}
-	if values := r.URL.Query()["{{ .Name }}"]; len(values) > 0 {
-		typed := make({{ .Type }}, len(values))
-		for i, v := range values {
-			typed[i] = {{ trimPrefix .Type "[]" }}(v)
-			if !typed[i].IsValid() {
-				http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-				return
-			}
-		}
-		{{ if .Required }}params.{{ .GoName }} = typed{{ else }}params.{{ .GoName }} = &typed{{ end }}
-	}{{ if .Required }} else {
-{{- template "paramError" dict "Echo" false "Writer" "rw" "Message" (printf "missing %s" .Name) }}
-	}{{ end }}
-{{- else if hasPrefix .Type "[]" }}
-	if values := r.URL.Query()["{{ .Name }}"]; len(values) > 0 {
-		{{ if .Required }}params.{{ .GoName }} = values{{ else }}params.{{ .GoName }} = &values{{ end }}
-	}{{ if .Required }} else {
-{{- template "paramError" dict "Echo" false "Writer" "rw" "Message" (printf "missing %s" .Name) }}
-	}{{ end }}
-{{- else }}
-{{- template "scalarParam" dict "Source" "query" "Echo" false "Writer" "rw" "Target" "params" "Param" . }}
-{{- end }}
+{{- template "param" dict "Source" "query" "Echo" false "Writer" "rw" "Handler" "w.requestError" "Target" "params" "Param" . }}
 {{- end }}
 {{- end }}
 {{- if .HasHeaderParams }}
 	var headers {{ .ID | pascalCase }}HeaderParams
 {{- range .HeaderParams }}
-{{- if hasPrefix .Type "[]" }}
-	if values := r.Header.Values("{{ .Name }}"); len(values) > 0 {
-		{{ if .Required }}headers.{{ .GoName }} = values{{ else }}headers.{{ .GoName }} = &values{{ end }}
-	}{{ if .Required }} else {
-{{- template "paramError" dict "Echo" false "Writer" "rw" "Message" (printf "missing %s" .Name) }}
-	}{{ end }}
-{{- else }}
-{{- template "scalarParam" dict "Source" "header" "Echo" false "Writer" "rw" "Target" "headers" "Param" . }}
-{{- end }}
+{{- template "param" dict "Source" "header" "Echo" false "Writer" "rw" "Handler" "w.requestError" "Target" "headers" "Param" . }}
 {{- end }}
 {{- end }}
 {{- if .HasCookieParams }}
 	var cookies {{ .ID | pascalCase }}CookieParams
 {{- range .CookieParams }}
-{{- template "scalarParam" dict "Source" "cookie" "Echo" false "Writer" "rw" "Target" "cookies" "Param" . }}
+{{- template "param" dict "Source" "cookie" "Echo" false "Writer" "rw" "Handler" "w.requestError" "Target" "cookies" "Param" . }}
 {{- end }}
 {{- end }}
 {{- if .HasQueryString }}
 	var {{ .QueryString.GoName | camelCase }} {{ .QueryString.Type }}
 	if err := decodeQueryString(r, &{{ .QueryString.GoName | camelCase }}); err != nil {
-		http.Error(rw, "invalid query parameters", http.StatusBadRequest)
-		return
+{{- template "reject" dict "Echo" false "Writer" "rw" "Handler" "w.requestError" "In" "querystring" "Name" .QueryString.Name "Reason" "invalid" "Err" "err" }}
 	}
 {{- end }}
 {{- if .IsMultipart }}
 	var req {{ .ID | pascalCase }}MultipartRequest
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		http.Error(rw, "failed to parse multipart form", http.StatusBadRequest)
-		return
+{{- template "reject" dict "Echo" false "Writer" "rw" "Handler" "w.requestError" "In" "body" "Name" "" "Reason" "invalid" "Err" "err" }}
 	}
 {{- range .RequestBody.MultipartFields }}
 {{- if .IsFile }}
@@ -248,8 +226,7 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 {{- if .IsFormUrlEncoded }}
 	var req {{ .ID | pascalCase }}FormRequest
 	if err := r.ParseForm(); err != nil {
-		http.Error(rw, "failed to parse form", http.StatusBadRequest)
-		return
+{{- template "reject" dict "Echo" false "Writer" "rw" "Handler" "w.requestError" "In" "body" "Name" "" "Reason" "invalid" "Err" "err" }}
 	}
 {{- range .RequestBody.MultipartFields }}
 {{- if .IsArray }}
@@ -287,11 +264,13 @@ func Handler(si ServerInterface) http.Handler {
 type StdlibServerOptions struct {
 	BaseURL     string
 	Middlewares []func(http.Handler) http.Handler
+	// RequestErrorHandler is copied to ServerInterfaceWrapper.RequestErrorHandler.
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 func HandlerWithOptions(si ServerInterface, options StdlibServerOptions) http.Handler {
 	mux := http.NewServeMux()
-	wrapper := &ServerInterfaceWrapper{Handler: si}
+	wrapper := &ServerInterfaceWrapper{Handler: si, RequestErrorHandler: options.RequestErrorHandler}
 {{ range .Operations }}
 	mux.HandleFunc("{{ .Method }} "+options.BaseURL+"{{ .FramePath }}", wrapper.{{ .ID | pascalCase }})
 {{- end }}

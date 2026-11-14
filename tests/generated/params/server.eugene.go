@@ -3,21 +3,62 @@ package gen
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
 
 type GetItemQueryParams struct {
-	Filter *string `query:"filter"`
-	Limit  *int    `query:"limit"`
+	Filter *string
+	Limit  *int
 }
 
 type GetItemHeaderParams struct {
-	XRequestID *string `header:"X-Request-ID"`
+	XRequestID *string
 }
 
 type GetItemCookieParams struct {
 	Session *string
+}
+
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
+func newRequestError(re *RequestError) error {
+	return echo.NewHTTPError(http.StatusBadRequest, re.Error()).SetInternal(re)
 }
 
 type ServerInterface interface {
@@ -32,12 +73,19 @@ type ServerInterfaceWrapper struct {
 func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 	id := ctx.Param("id")
 	var params GetItemQueryParams
-	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	if v := ctx.QueryParam("filter"); v != "" {
+		params.Filter = &v
+	}
+	if v := ctx.QueryParam("limit"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "limit", Reason: "invalid", Err: err})
+		}
+		params.Limit = &parsed
 	}
 	var headers GetItemHeaderParams
-	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	if v := ctx.Request().Header.Get("X-Request-ID"); v != "" {
+		headers.XRequestID = &v
 	}
 	var cookies GetItemCookieParams
 	if c, err := ctx.Cookie("session"); err == nil {

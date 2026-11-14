@@ -9,27 +9,72 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
 // StrictOptions configures a strict handler.
 type StrictOptions struct {
 	// ErrorHandler writes the response when an operation returns an error or its
 	// response cannot be written. The default sends a bare 500 without the error.
 	ErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+	// RequestErrorHandler answers requests rejected before the operation runs,
+	// with err a *RequestError. The default sends a 400 with err.Error().
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // StrictChiHandler wraps a StrictServerInterface to handle Chi requests.
 type StrictChiHandler struct {
-	ssi          StrictServerInterface
-	errorHandler func(w http.ResponseWriter, r *http.Request, err error)
+	ssi                 StrictServerInterface
+	errorHandler        func(w http.ResponseWriter, r *http.Request, err error)
+	requestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // NewStrictHandler creates a new StrictChiHandler.
 func NewStrictHandler(ssi StrictServerInterface, opts ...StrictOptions) *StrictChiHandler {
 	h := &StrictChiHandler{ssi: ssi, errorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}, requestErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}}
 	for _, o := range opts {
 		if o.ErrorHandler != nil {
 			h.errorHandler = o.ErrorHandler
+		}
+		if o.RequestErrorHandler != nil {
+			h.requestErrorHandler = o.RequestErrorHandler
 		}
 	}
 	return h
@@ -41,7 +86,7 @@ func (h *StrictChiHandler) ListItems(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("limit"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			http.Error(w, "invalid limit", http.StatusBadRequest)
+			h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "limit", Reason: "invalid", Err: err})
 			return
 		}
 		request.Limit = &parsed
@@ -63,7 +108,7 @@ func (h *StrictChiHandler) CreateItem(w http.ResponseWriter, r *http.Request) {
 	var request CreateItemRequestObject
 	var body NewItem
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 		return
 	}
 	request.Body = body
@@ -98,7 +143,7 @@ func (h *StrictChiHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 	var request UpdateItemRequestObject
 	var body NewItem
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 		return
 	}
 	request.Body = body
@@ -134,7 +179,7 @@ func (h *StrictChiHandler) ListLegacyLinks(w http.ResponseWriter, r *http.Reques
 	if values := r.URL.Query()["kinds"]; len(values) > 0 {
 		request.Kinds = values
 	} else {
-		http.Error(w, "missing kinds", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "kinds", Reason: "missing"})
 		return
 	}
 	if values := r.URL.Query()["scopes"]; len(values) > 0 {
@@ -142,7 +187,7 @@ func (h *StrictChiHandler) ListLegacyLinks(w http.ResponseWriter, r *http.Reques
 		for i, v := range values {
 			typed[i] = LinkScope(v)
 			if !typed[i].IsValid() {
-				http.Error(w, "invalid scopes", http.StatusBadRequest)
+				h.requestErrorHandler(w, r, &RequestError{In: "query", Name: "scopes", Reason: "invalid"})
 				return
 			}
 		}
@@ -165,12 +210,12 @@ func (h *StrictChiHandler) GetLegacyLink(w http.ResponseWriter, r *http.Request)
 	var request GetLegacyLinkRequestObject
 	request.Kind = Kind(chi.URLParam(r, "kind"))
 	if !request.Kind.IsValid() {
-		http.Error(w, "invalid kind", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "path", Name: "kind", Reason: "invalid"})
 		return
 	}
 	request.Scope = LinkScope(chi.URLParam(r, "scope"))
 	if !request.Scope.IsValid() {
-		http.Error(w, "invalid scope", http.StatusBadRequest)
+		h.requestErrorHandler(w, r, &RequestError{In: "path", Name: "scope", Reason: "invalid"})
 		return
 	}
 

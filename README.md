@@ -189,6 +189,42 @@ RegisterStrictHandlers(router, impl, StrictOptions{
 })
 ```
 
+### Request errors
+
+A request with a missing required parameter, an unparseable or out-of-enum
+value, or an undecodable body is rejected with a 400 before the operation runs.
+The error is a `*RequestError` generated in each server package:
+
+```go
+type RequestError struct {
+    In     string // path, query, querystring, header, cookie or body
+    Name   string // parameter name as in the spec; empty for the body
+    Reason string // "missing" or "invalid"
+    Err    error  // parse error, if any
+}
+```
+
+`Error()` is the text sent by default (`missing X-User-ID`, `invalid status`,
+`invalid request body`). `Err` can quote the raw input, so keep it out of
+responses. `Location()`, `Parameter()` and `Missing()` let one interface match
+the errors of every generated package:
+
+```go
+type requestError interface {
+    Location() string
+    Parameter() string
+    Missing() bool
+}
+
+var re requestError
+if errors.As(err, &re) { ... }
+```
+
+With Echo, the `*RequestError` is the `Internal` of a 400 `*echo.HTTPError`,
+so `errors.As` finds it in your `HTTPErrorHandler`. With chi and stdlib, set
+`RequestErrorHandler` on `StrictOptions` or on `ChiServerOptions` /
+`StdlibServerOptions`; the default writes `err.Error()` with a 400.
+
 ### Client (`client.go`)
 
 HTTP client with typed methods:

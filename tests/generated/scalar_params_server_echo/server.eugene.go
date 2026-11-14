@@ -74,34 +74,34 @@ func (w *Writer) SendRaw(eventType string, data []byte) error {
 }
 
 type GetPrefsQueryParams struct {
-	QSid     string     `query:"q_sid"`
-	QCount   *int       `query:"q_count"`
-	QCount32 int32      `query:"q_count32"`
-	QCount64 *int64     `query:"q_count64"`
-	QRatio   *float64   `query:"q_ratio"`
-	QBeta    *bool      `query:"q_beta"`
-	QDevice  *uuid.UUID `query:"q_device"`
-	QSince   *time.Time `query:"q_since"`
-	QTheme   *Theme     `query:"q_theme"`
-	QMode    XMode      `query:"q_mode"`
-	QToken   *Token     `query:"q_token"`
-	QTags    []string   `query:"q_tags"`
-	QThemes  *[]Theme   `query:"q_themes"`
+	QSid     string
+	QCount   *int
+	QCount32 int32
+	QCount64 *int64
+	QRatio   *float64
+	QBeta    *bool
+	QDevice  *uuid.UUID
+	QSince   *time.Time
+	QTheme   *Theme
+	QMode    XMode
+	QToken   *Token
+	QTags    []string
+	QThemes  *[]Theme
 }
 
 type GetPrefsHeaderParams struct {
-	XSid     string     `header:"X-Sid"`
-	XCount   *int       `header:"X-Count"`
-	XCount32 int32      `header:"X-Count32"`
-	XCount64 *int64     `header:"X-Count64"`
-	XRatio   *float64   `header:"X-Ratio"`
-	XBeta    *bool      `header:"X-Beta"`
-	XDevice  *uuid.UUID `header:"X-Device"`
-	XSince   *time.Time `header:"X-Since"`
-	XTheme   *Theme     `header:"X-Theme"`
-	XMode    *XMode     `header:"X-Mode"`
-	XToken   *Token     `header:"X-Token"`
-	XTags    []string   `header:"X-Tags"`
+	XSid     string
+	XCount   *int
+	XCount32 int32
+	XCount64 *int64
+	XRatio   *float64
+	XBeta    *bool
+	XDevice  *uuid.UUID
+	XSince   *time.Time
+	XTheme   *Theme
+	XMode    *XMode
+	XToken   *Token
+	XTags    []string
 }
 
 type GetPrefsCookieParams struct {
@@ -123,6 +123,46 @@ type StreamEventsCookieParams struct {
 	Since *time.Time
 }
 
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
+func newRequestError(re *RequestError) error {
+	return echo.NewHTTPError(http.StatusBadRequest, re.Error()).SetInternal(re)
+}
+
 type ServerInterface interface {
 	// GetPrefs
 	GetPrefs(ctx echo.Context, params GetPrefsQueryParams, headers GetPrefsHeaderParams, cookies GetPrefsCookieParams) error
@@ -137,64 +177,192 @@ type ServerInterfaceWrapper struct {
 }
 
 func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
-	if ctx.QueryParam("q_sid") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing q_sid")
-	}
-	if ctx.QueryParam("q_count32") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing q_count32")
-	}
-	if ctx.QueryParam("q_mode") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing q_mode")
-	}
-	if len(ctx.QueryParams()["q_tags"]) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing q_tags")
-	}
 	var params GetPrefsQueryParams
-	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	if v := ctx.QueryParam("q_sid"); v != "" {
+		params.QSid = v
+	} else {
+		return newRequestError(&RequestError{In: "query", Name: "q_sid", Reason: "missing"})
 	}
-	if params.QTheme != nil && !params.QTheme.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid q_theme")
+	if v := ctx.QueryParam("q_count"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "q_count", Reason: "invalid", Err: err})
+		}
+		params.QCount = &parsed
 	}
-	if !params.QMode.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid q_mode")
+	if v := ctx.QueryParam("q_count32"); v != "" {
+		parsed64, err := strconv.ParseInt(v, 10, 32)
+		parsed := int32(parsed64)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "q_count32", Reason: "invalid", Err: err})
+		}
+		params.QCount32 = parsed
+	} else {
+		return newRequestError(&RequestError{In: "query", Name: "q_count32", Reason: "missing"})
 	}
-	if params.QThemes != nil {
-		for _, v := range *params.QThemes {
-			if !v.IsValid() {
-				return echo.NewHTTPError(http.StatusBadRequest, "invalid q_themes")
+	if v := ctx.QueryParam("q_count64"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "q_count64", Reason: "invalid", Err: err})
+		}
+		params.QCount64 = &parsed
+	}
+	if v := ctx.QueryParam("q_ratio"); v != "" {
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "q_ratio", Reason: "invalid", Err: err})
+		}
+		params.QRatio = &parsed
+	}
+	if v := ctx.QueryParam("q_beta"); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "q_beta", Reason: "invalid", Err: err})
+		}
+		params.QBeta = &parsed
+	}
+	if v := ctx.QueryParam("q_device"); v != "" {
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "q_device", Reason: "invalid", Err: err})
+		}
+		params.QDevice = &parsed
+	}
+	if v := ctx.QueryParam("q_since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "q_since", Reason: "invalid", Err: err})
+		}
+		params.QSince = &parsed
+	}
+	if v := ctx.QueryParam("q_theme"); v != "" {
+		typed := Theme(v)
+		if !typed.IsValid() {
+			return newRequestError(&RequestError{In: "query", Name: "q_theme", Reason: "invalid"})
+		}
+		params.QTheme = &typed
+	}
+	if v := ctx.QueryParam("q_mode"); v != "" {
+		typed := XMode(v)
+		if !typed.IsValid() {
+			return newRequestError(&RequestError{In: "query", Name: "q_mode", Reason: "invalid"})
+		}
+		params.QMode = typed
+	} else {
+		return newRequestError(&RequestError{In: "query", Name: "q_mode", Reason: "missing"})
+	}
+	if v := ctx.QueryParam("q_token"); v != "" {
+		typed := Token(v)
+		params.QToken = &typed
+	}
+	if values := ctx.QueryParams()["q_tags"]; len(values) > 0 {
+		params.QTags = values
+	} else {
+		return newRequestError(&RequestError{In: "query", Name: "q_tags", Reason: "missing"})
+	}
+	if values := ctx.QueryParams()["q_themes"]; len(values) > 0 {
+		typed := make([]Theme, len(values))
+		for i, v := range values {
+			typed[i] = Theme(v)
+			if !typed[i].IsValid() {
+				return newRequestError(&RequestError{In: "query", Name: "q_themes", Reason: "invalid"})
 			}
 		}
-	}
-	if ctx.Request().Header.Get("X-Sid") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Sid")
-	}
-	if ctx.Request().Header.Get("X-Count32") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Count32")
-	}
-	if ctx.Request().Header.Get("X-Tags") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tags")
+		params.QThemes = &typed
 	}
 	var headers GetPrefsHeaderParams
-	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	if v := ctx.Request().Header.Get("X-Sid"); v != "" {
+		headers.XSid = v
+	} else {
+		return newRequestError(&RequestError{In: "header", Name: "X-Sid", Reason: "missing"})
 	}
-	if headers.XTheme != nil && !headers.XTheme.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Theme")
+	if v := ctx.Request().Header.Get("X-Count"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Count", Reason: "invalid", Err: err})
+		}
+		headers.XCount = &parsed
 	}
-	if headers.XMode != nil && !headers.XMode.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Mode")
+	if v := ctx.Request().Header.Get("X-Count32"); v != "" {
+		parsed64, err := strconv.ParseInt(v, 10, 32)
+		parsed := int32(parsed64)
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Count32", Reason: "invalid", Err: err})
+		}
+		headers.XCount32 = parsed
+	} else {
+		return newRequestError(&RequestError{In: "header", Name: "X-Count32", Reason: "missing"})
+	}
+	if v := ctx.Request().Header.Get("X-Count64"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Count64", Reason: "invalid", Err: err})
+		}
+		headers.XCount64 = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Ratio"); v != "" {
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Ratio", Reason: "invalid", Err: err})
+		}
+		headers.XRatio = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Beta"); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Beta", Reason: "invalid", Err: err})
+		}
+		headers.XBeta = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Device"); v != "" {
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Device", Reason: "invalid", Err: err})
+		}
+		headers.XDevice = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Since", Reason: "invalid", Err: err})
+		}
+		headers.XSince = &parsed
+	}
+	if v := ctx.Request().Header.Get("X-Theme"); v != "" {
+		typed := Theme(v)
+		if !typed.IsValid() {
+			return newRequestError(&RequestError{In: "header", Name: "X-Theme", Reason: "invalid"})
+		}
+		headers.XTheme = &typed
+	}
+	if v := ctx.Request().Header.Get("X-Mode"); v != "" {
+		typed := XMode(v)
+		if !typed.IsValid() {
+			return newRequestError(&RequestError{In: "header", Name: "X-Mode", Reason: "invalid"})
+		}
+		headers.XMode = &typed
+	}
+	if v := ctx.Request().Header.Get("X-Token"); v != "" {
+		typed := Token(v)
+		headers.XToken = &typed
+	}
+	if values := ctx.Request().Header.Values("X-Tags"); len(values) > 0 {
+		headers.XTags = values
+	} else {
+		return newRequestError(&RequestError{In: "header", Name: "X-Tags", Reason: "missing"})
 	}
 	var cookies GetPrefsCookieParams
 	if c, err := ctx.Cookie("sid"); err == nil {
 		cookies.Sid = c.Value
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing sid")
+		return newRequestError(&RequestError{In: "cookie", Name: "sid", Reason: "missing"})
 	}
 	if c, err := ctx.Cookie("count"); err == nil {
 		parsed, err := strconv.Atoi(c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid count")
+			return newRequestError(&RequestError{In: "cookie", Name: "count", Reason: "invalid", Err: err})
 		}
 		cookies.Count = &parsed
 	}
@@ -202,30 +370,30 @@ func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
 		parsed64, err := strconv.ParseInt(c.Value, 10, 32)
 		parsed := int32(parsed64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid count32")
+			return newRequestError(&RequestError{In: "cookie", Name: "count32", Reason: "invalid", Err: err})
 		}
 		cookies.Count32 = parsed
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing count32")
+		return newRequestError(&RequestError{In: "cookie", Name: "count32", Reason: "missing"})
 	}
 	if c, err := ctx.Cookie("count64"); err == nil {
 		parsed, err := strconv.ParseInt(c.Value, 10, 64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid count64")
+			return newRequestError(&RequestError{In: "cookie", Name: "count64", Reason: "invalid", Err: err})
 		}
 		cookies.Count64 = &parsed
 	}
 	if c, err := ctx.Cookie("ratio"); err == nil {
 		parsed, err := strconv.ParseFloat(c.Value, 64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid ratio")
+			return newRequestError(&RequestError{In: "cookie", Name: "ratio", Reason: "invalid", Err: err})
 		}
 		cookies.Ratio = &parsed
 	}
 	if c, err := ctx.Cookie("beta"); err == nil {
 		parsed, err := strconv.ParseBool(c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid beta")
+			return newRequestError(&RequestError{In: "cookie", Name: "beta", Reason: "invalid", Err: err})
 		}
 		cookies.Beta = &parsed
 	}
@@ -233,28 +401,28 @@ func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
 		var parsed uuid.UUID
 		err := parsed.UnmarshalText([]byte(c.Value))
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid device")
+			return newRequestError(&RequestError{In: "cookie", Name: "device", Reason: "invalid", Err: err})
 		}
 		cookies.Device = &parsed
 	}
 	if c, err := ctx.Cookie("since"); err == nil {
 		parsed, err := time.Parse(time.RFC3339, c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid since")
+			return newRequestError(&RequestError{In: "cookie", Name: "since", Reason: "invalid", Err: err})
 		}
 		cookies.Since = &parsed
 	}
 	if c, err := ctx.Cookie("theme"); err == nil {
 		typed := Theme(c.Value)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid theme")
+			return newRequestError(&RequestError{In: "cookie", Name: "theme", Reason: "invalid"})
 		}
 		cookies.Theme = &typed
 	}
 	if c, err := ctx.Cookie("mode"); err == nil {
 		typed := XMode(c.Value)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid mode")
+			return newRequestError(&RequestError{In: "cookie", Name: "mode", Reason: "invalid"})
 		}
 		cookies.Mode = &typed
 	}
@@ -268,7 +436,7 @@ func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
 func (w *ServerInterfaceWrapper) GetDevice(ctx echo.Context) error {
 	var id uuid.UUID
 	if err := id.UnmarshalText([]byte(ctx.Param("id"))); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+		return newRequestError(&RequestError{In: "path", Name: "id", Reason: "invalid", Err: err})
 	}
 	return w.Handler.GetDevice(ctx, id)
 }
@@ -278,12 +446,12 @@ func (w *ServerInterfaceWrapper) StreamEvents(ctx echo.Context) error {
 	if c, err := ctx.Cookie("sid"); err == nil {
 		cookies.Sid = c.Value
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing sid")
+		return newRequestError(&RequestError{In: "cookie", Name: "sid", Reason: "missing"})
 	}
 	if c, err := ctx.Cookie("since"); err == nil {
 		parsed, err := time.Parse(time.RFC3339, c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid since")
+			return newRequestError(&RequestError{In: "cookie", Name: "since", Reason: "invalid", Err: err})
 		}
 		cookies.Since = &parsed
 	}

@@ -15,6 +15,7 @@ import (
 	"{{ .UUIDImport }}"
 {{- end }}
 )
+{{- template "requestErrorType" true }}
 
 // StrictEchoHandler wraps a StrictServerInterface to handle Echo requests.
 type StrictEchoHandler struct {
@@ -34,64 +35,35 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 {{- range .PathParams }}
 {{- if eq .Type "uuid.UUID" }}
 	if err := request.{{ .GoName }}.UnmarshalText([]byte(ctx.Param("{{ .Name }}"))); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+{{- template "reject" dict "Echo" true "Writer" "" "Handler" "" "In" "path" "Name" .Name "Reason" "invalid" "Err" "err" }}
 	}
 {{- else if .IsEnum }}
 	request.{{ .GoName }} = {{ .Type }}(ctx.Param("{{ .Name }}"))
 	if !request.{{ .GoName }}.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+{{- template "reject" dict "Echo" true "Writer" "" "Handler" "" "In" "path" "Name" .Name "Reason" "invalid" "Err" "" }}
 	}
 {{- else }}
 	request.{{ .GoName }} = ctx.Param("{{ .Name }}")
 {{- end }}
 {{- end }}
 {{- range .QueryParams }}
-{{- if .IsEnumArray }}
-	if values := ctx.QueryParams()["{{ .Name }}"]; len(values) > 0 {
-		typed := make({{ .Type }}, len(values))
-		for i, v := range values {
-			typed[i] = {{ trimPrefix .Type "[]" }}(v)
-			if !typed[i].IsValid() {
-				return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
-			}
-		}
-		{{ if .Required }}request.{{ .GoName }} = typed{{ else }}request.{{ .GoName }} = &typed{{ end }}
-	}{{ if .Required }} else {
-{{- template "paramError" dict "Echo" true "Writer" "" "Message" (printf "missing %s" .Name) }}
-	}{{ end }}
-{{- else if hasPrefix .Type "[]" }}
-	if values := ctx.QueryParams()["{{ .Name }}"]; len(values) > 0 {
-		{{ if .Required }}request.{{ .GoName }} = values{{ else }}request.{{ .GoName }} = &values{{ end }}
-	}{{ if .Required }} else {
-{{- template "paramError" dict "Echo" true "Writer" "" "Message" (printf "missing %s" .Name) }}
-	}{{ end }}
-{{- else }}
-{{- template "scalarParam" dict "Source" "query" "Echo" true "Writer" "" "Target" "request" "Param" . }}
-{{- end }}
+{{- template "param" dict "Source" "query" "Echo" true "Writer" "" "Handler" "" "Target" "request" "Param" . }}
 {{- end }}
 {{- range .HeaderParams }}
-{{- if hasPrefix .Type "[]" }}
-	if values := ctx.Request().Header.Values("{{ .Name }}"); len(values) > 0 {
-		{{ if .Required }}request.{{ .GoName }} = values{{ else }}request.{{ .GoName }} = &values{{ end }}
-	}{{ if .Required }} else {
-{{- template "paramError" dict "Echo" true "Writer" "" "Message" (printf "missing %s" .Name) }}
-	}{{ end }}
-{{- else }}
-{{- template "scalarParam" dict "Source" "header" "Echo" true "Writer" "" "Target" "request" "Param" . }}
-{{- end }}
+{{- template "param" dict "Source" "header" "Echo" true "Writer" "" "Handler" "" "Target" "request" "Param" . }}
 {{- end }}
 {{- range .CookieParams }}
-{{- template "scalarParam" dict "Source" "cookie" "Echo" true "Writer" "" "Target" "request" "Param" . }}
+{{- template "param" dict "Source" "cookie" "Echo" true "Writer" "" "Handler" "" "Target" "request" "Param" . }}
 {{- end }}
 {{- if .QueryString }}
 	if err := ctx.Bind(&request.{{ .QueryString.GoName }}); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid querystring")
+{{- template "reject" dict "Echo" true "Writer" "" "Handler" "" "In" "querystring" "Name" .QueryString.Name "Reason" "invalid" "Err" "err" }}
 	}
 {{- end }}
 {{- if .RequestBody }}
 	{{ if .RequestBody.Required }}var body {{ .RequestBody.Type }}
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+{{- template "reject" dict "Echo" true "Writer" "" "Handler" "" "In" "body" "Name" "" "Reason" "invalid" "Err" "err" }}
 	}
 	request.Body = body{{ else }}var body {{ .RequestBody.Type }}
 	if err := ctx.Bind(&body); err == nil {

@@ -10,6 +10,46 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
+func newRequestError(re *RequestError) error {
+	return echo.NewHTTPError(http.StatusBadRequest, re.Error()).SetInternal(re)
+}
+
 // StrictEchoHandler wraps a StrictServerInterface to handle Echo requests.
 type StrictEchoHandler struct {
 	ssi StrictServerInterface
@@ -26,12 +66,12 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 	if v := ctx.QueryParam("q_sid"); v != "" {
 		request.QSid = v
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing q_sid")
+		return newRequestError(&RequestError{In: "query", Name: "q_sid", Reason: "missing"})
 	}
 	if v := ctx.QueryParam("q_count"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_count")
+			return newRequestError(&RequestError{In: "query", Name: "q_count", Reason: "invalid", Err: err})
 		}
 		request.QCount = &parsed
 	}
@@ -39,30 +79,30 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		parsed64, err := strconv.ParseInt(v, 10, 32)
 		parsed := int32(parsed64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_count32")
+			return newRequestError(&RequestError{In: "query", Name: "q_count32", Reason: "invalid", Err: err})
 		}
 		request.QCount32 = parsed
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing q_count32")
+		return newRequestError(&RequestError{In: "query", Name: "q_count32", Reason: "missing"})
 	}
 	if v := ctx.QueryParam("q_count64"); v != "" {
 		parsed, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_count64")
+			return newRequestError(&RequestError{In: "query", Name: "q_count64", Reason: "invalid", Err: err})
 		}
 		request.QCount64 = &parsed
 	}
 	if v := ctx.QueryParam("q_ratio"); v != "" {
 		parsed, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_ratio")
+			return newRequestError(&RequestError{In: "query", Name: "q_ratio", Reason: "invalid", Err: err})
 		}
 		request.QRatio = &parsed
 	}
 	if v := ctx.QueryParam("q_beta"); v != "" {
 		parsed, err := strconv.ParseBool(v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_beta")
+			return newRequestError(&RequestError{In: "query", Name: "q_beta", Reason: "invalid", Err: err})
 		}
 		request.QBeta = &parsed
 	}
@@ -70,32 +110,32 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		var parsed uuid.UUID
 		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_device")
+			return newRequestError(&RequestError{In: "query", Name: "q_device", Reason: "invalid", Err: err})
 		}
 		request.QDevice = &parsed
 	}
 	if v := ctx.QueryParam("q_since"); v != "" {
 		parsed, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_since")
+			return newRequestError(&RequestError{In: "query", Name: "q_since", Reason: "invalid", Err: err})
 		}
 		request.QSince = &parsed
 	}
 	if v := ctx.QueryParam("q_theme"); v != "" {
 		typed := Theme(v)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_theme")
+			return newRequestError(&RequestError{In: "query", Name: "q_theme", Reason: "invalid"})
 		}
 		request.QTheme = &typed
 	}
 	if v := ctx.QueryParam("q_mode"); v != "" {
 		typed := XMode(v)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_mode")
+			return newRequestError(&RequestError{In: "query", Name: "q_mode", Reason: "invalid"})
 		}
 		request.QMode = typed
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing q_mode")
+		return newRequestError(&RequestError{In: "query", Name: "q_mode", Reason: "missing"})
 	}
 	if v := ctx.QueryParam("q_token"); v != "" {
 		typed := Token(v)
@@ -104,14 +144,14 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 	if values := ctx.QueryParams()["q_tags"]; len(values) > 0 {
 		request.QTags = values
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing q_tags")
+		return newRequestError(&RequestError{In: "query", Name: "q_tags", Reason: "missing"})
 	}
 	if values := ctx.QueryParams()["q_themes"]; len(values) > 0 {
 		typed := make([]Theme, len(values))
 		for i, v := range values {
 			typed[i] = Theme(v)
 			if !typed[i].IsValid() {
-				return echo.NewHTTPError(http.StatusBadRequest, "invalid q_themes")
+				return newRequestError(&RequestError{In: "query", Name: "q_themes", Reason: "invalid"})
 			}
 		}
 		request.QThemes = &typed
@@ -119,12 +159,12 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 	if v := ctx.Request().Header.Get("X-Sid"); v != "" {
 		request.XSid = v
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Sid")
+		return newRequestError(&RequestError{In: "header", Name: "X-Sid", Reason: "missing"})
 	}
 	if v := ctx.Request().Header.Get("X-Count"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Count")
+			return newRequestError(&RequestError{In: "header", Name: "X-Count", Reason: "invalid", Err: err})
 		}
 		request.XCount = &parsed
 	}
@@ -132,30 +172,30 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		parsed64, err := strconv.ParseInt(v, 10, 32)
 		parsed := int32(parsed64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Count32")
+			return newRequestError(&RequestError{In: "header", Name: "X-Count32", Reason: "invalid", Err: err})
 		}
 		request.XCount32 = parsed
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Count32")
+		return newRequestError(&RequestError{In: "header", Name: "X-Count32", Reason: "missing"})
 	}
 	if v := ctx.Request().Header.Get("X-Count64"); v != "" {
 		parsed, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Count64")
+			return newRequestError(&RequestError{In: "header", Name: "X-Count64", Reason: "invalid", Err: err})
 		}
 		request.XCount64 = &parsed
 	}
 	if v := ctx.Request().Header.Get("X-Ratio"); v != "" {
 		parsed, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Ratio")
+			return newRequestError(&RequestError{In: "header", Name: "X-Ratio", Reason: "invalid", Err: err})
 		}
 		request.XRatio = &parsed
 	}
 	if v := ctx.Request().Header.Get("X-Beta"); v != "" {
 		parsed, err := strconv.ParseBool(v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Beta")
+			return newRequestError(&RequestError{In: "header", Name: "X-Beta", Reason: "invalid", Err: err})
 		}
 		request.XBeta = &parsed
 	}
@@ -163,28 +203,28 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		var parsed uuid.UUID
 		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Device")
+			return newRequestError(&RequestError{In: "header", Name: "X-Device", Reason: "invalid", Err: err})
 		}
 		request.XDevice = &parsed
 	}
 	if v := ctx.Request().Header.Get("X-Since"); v != "" {
 		parsed, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Since")
+			return newRequestError(&RequestError{In: "header", Name: "X-Since", Reason: "invalid", Err: err})
 		}
 		request.XSince = &parsed
 	}
 	if v := ctx.Request().Header.Get("X-Theme"); v != "" {
 		typed := Theme(v)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Theme")
+			return newRequestError(&RequestError{In: "header", Name: "X-Theme", Reason: "invalid"})
 		}
 		request.XTheme = &typed
 	}
 	if v := ctx.Request().Header.Get("X-Mode"); v != "" {
 		typed := XMode(v)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Mode")
+			return newRequestError(&RequestError{In: "header", Name: "X-Mode", Reason: "invalid"})
 		}
 		request.XMode = &typed
 	}
@@ -195,17 +235,17 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 	if values := ctx.Request().Header.Values("X-Tags"); len(values) > 0 {
 		request.XTags = values
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tags")
+		return newRequestError(&RequestError{In: "header", Name: "X-Tags", Reason: "missing"})
 	}
 	if c, err := ctx.Cookie("sid"); err == nil {
 		request.Sid = c.Value
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing sid")
+		return newRequestError(&RequestError{In: "cookie", Name: "sid", Reason: "missing"})
 	}
 	if c, err := ctx.Cookie("count"); err == nil {
 		parsed, err := strconv.Atoi(c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid count")
+			return newRequestError(&RequestError{In: "cookie", Name: "count", Reason: "invalid", Err: err})
 		}
 		request.Count = &parsed
 	}
@@ -213,30 +253,30 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		parsed64, err := strconv.ParseInt(c.Value, 10, 32)
 		parsed := int32(parsed64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid count32")
+			return newRequestError(&RequestError{In: "cookie", Name: "count32", Reason: "invalid", Err: err})
 		}
 		request.Count32 = parsed
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing count32")
+		return newRequestError(&RequestError{In: "cookie", Name: "count32", Reason: "missing"})
 	}
 	if c, err := ctx.Cookie("count64"); err == nil {
 		parsed, err := strconv.ParseInt(c.Value, 10, 64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid count64")
+			return newRequestError(&RequestError{In: "cookie", Name: "count64", Reason: "invalid", Err: err})
 		}
 		request.Count64 = &parsed
 	}
 	if c, err := ctx.Cookie("ratio"); err == nil {
 		parsed, err := strconv.ParseFloat(c.Value, 64)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid ratio")
+			return newRequestError(&RequestError{In: "cookie", Name: "ratio", Reason: "invalid", Err: err})
 		}
 		request.Ratio = &parsed
 	}
 	if c, err := ctx.Cookie("beta"); err == nil {
 		parsed, err := strconv.ParseBool(c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid beta")
+			return newRequestError(&RequestError{In: "cookie", Name: "beta", Reason: "invalid", Err: err})
 		}
 		request.Beta = &parsed
 	}
@@ -244,28 +284,28 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		var parsed uuid.UUID
 		err := parsed.UnmarshalText([]byte(c.Value))
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid device")
+			return newRequestError(&RequestError{In: "cookie", Name: "device", Reason: "invalid", Err: err})
 		}
 		request.Device = &parsed
 	}
 	if c, err := ctx.Cookie("since"); err == nil {
 		parsed, err := time.Parse(time.RFC3339, c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid since")
+			return newRequestError(&RequestError{In: "cookie", Name: "since", Reason: "invalid", Err: err})
 		}
 		request.Since = &parsed
 	}
 	if c, err := ctx.Cookie("theme"); err == nil {
 		typed := Theme(c.Value)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid theme")
+			return newRequestError(&RequestError{In: "cookie", Name: "theme", Reason: "invalid"})
 		}
 		request.Theme = &typed
 	}
 	if c, err := ctx.Cookie("mode"); err == nil {
 		typed := XMode(c.Value)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid mode")
+			return newRequestError(&RequestError{In: "cookie", Name: "mode", Reason: "invalid"})
 		}
 		request.Mode = &typed
 	}
@@ -286,7 +326,7 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 func (h *StrictEchoHandler) GetDevice(ctx echo.Context) error {
 	var request GetDeviceRequestObject
 	if err := request.ID.UnmarshalText([]byte(ctx.Param("id"))); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+		return newRequestError(&RequestError{In: "path", Name: "id", Reason: "invalid", Err: err})
 	}
 
 	response, err := h.ssi.GetDevice(ctx.Request().Context(), request)
@@ -303,12 +343,12 @@ func (h *StrictEchoHandler) StreamEvents(ctx echo.Context) error {
 	if c, err := ctx.Cookie("sid"); err == nil {
 		request.Sid = c.Value
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing sid")
+		return newRequestError(&RequestError{In: "cookie", Name: "sid", Reason: "missing"})
 	}
 	if c, err := ctx.Cookie("since"); err == nil {
 		parsed, err := time.Parse(time.RFC3339, c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid since")
+			return newRequestError(&RequestError{In: "cookie", Name: "since", Reason: "invalid", Err: err})
 		}
 		request.Since = &parsed
 	}

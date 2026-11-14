@@ -3,6 +3,7 @@ package gen
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
@@ -28,12 +29,52 @@ func (e Kind) IsValid() bool {
 }
 
 type ListItemsQueryParams struct {
-	Limit *int `query:"limit"`
+	Limit *int
 }
 
 type ListLegacyLinksQueryParams struct {
-	Kinds  []string     `query:"kinds"`
-	Scopes *[]LinkScope `query:"scopes"`
+	Kinds  []string
+	Scopes *[]LinkScope
+}
+
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
+func newRequestError(re *RequestError) error {
+	return echo.NewHTTPError(http.StatusBadRequest, re.Error()).SetInternal(re)
 }
 
 type ServerInterface interface {
@@ -59,8 +100,12 @@ type ServerInterfaceWrapper struct {
 
 func (w *ServerInterfaceWrapper) ListItems(ctx echo.Context) error {
 	var params ListItemsQueryParams
-	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	if v := ctx.QueryParam("limit"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "limit", Reason: "invalid", Err: err})
+		}
+		params.Limit = &parsed
 	}
 	return w.Handler.ListItems(ctx, params)
 }
@@ -82,19 +127,21 @@ func (w *ServerInterfaceWrapper) DeleteItem(ctx echo.Context) error {
 }
 
 func (w *ServerInterfaceWrapper) ListLegacyLinks(ctx echo.Context) error {
-	if len(ctx.QueryParams()["kinds"]) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing kinds")
-	}
 	var params ListLegacyLinksQueryParams
-	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	if values := ctx.QueryParams()["kinds"]; len(values) > 0 {
+		params.Kinds = values
+	} else {
+		return newRequestError(&RequestError{In: "query", Name: "kinds", Reason: "missing"})
 	}
-	if params.Scopes != nil {
-		for _, v := range *params.Scopes {
-			if !v.IsValid() {
-				return echo.NewHTTPError(http.StatusBadRequest, "invalid scopes")
+	if values := ctx.QueryParams()["scopes"]; len(values) > 0 {
+		typed := make([]LinkScope, len(values))
+		for i, v := range values {
+			typed[i] = LinkScope(v)
+			if !typed[i].IsValid() {
+				return newRequestError(&RequestError{In: "query", Name: "scopes", Reason: "invalid"})
 			}
 		}
+		params.Scopes = &typed
 	}
 	return w.Handler.ListLegacyLinks(ctx, params)
 }
@@ -102,11 +149,11 @@ func (w *ServerInterfaceWrapper) ListLegacyLinks(ctx echo.Context) error {
 func (w *ServerInterfaceWrapper) GetLegacyLink(ctx echo.Context) error {
 	kind := Kind(ctx.Param("kind"))
 	if !kind.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid kind")
+		return newRequestError(&RequestError{In: "path", Name: "kind", Reason: "invalid"})
 	}
 	scope := LinkScope(ctx.Param("scope"))
 	if !scope.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid scope")
+		return newRequestError(&RequestError{In: "path", Name: "scope", Reason: "invalid"})
 	}
 	return w.Handler.GetLegacyLink(ctx, kind, scope)
 }

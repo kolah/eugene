@@ -60,6 +60,42 @@ type SearchQueryParams struct {
 	Since  *time.Time
 }
 
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(w http.ResponseWriter, r *http.Request)
@@ -89,6 +125,17 @@ type ServerInterface interface {
 
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+	// RequestErrorHandler answers requests rejected before the operation runs,
+	// with err a *RequestError. Nil sends a 400 with err.Error().
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+}
+
+func (w *ServerInterfaceWrapper) requestError(rw http.ResponseWriter, r *http.Request, err error) {
+	if w.RequestErrorHandler != nil {
+		w.RequestErrorHandler(rw, r, err)
+		return
+	}
+	http.Error(rw, err.Error(), http.StatusBadRequest)
 }
 
 func (w *ServerInterfaceWrapper) EchoJSON(rw http.ResponseWriter, r *http.Request) {
@@ -98,7 +145,7 @@ func (w *ServerInterfaceWrapper) EchoJSON(rw http.ResponseWriter, r *http.Reques
 func (w *ServerInterfaceWrapper) EchoForm(rw http.ResponseWriter, r *http.Request) {
 	var req EchoFormFormRequest
 	if err := r.ParseForm(); err != nil {
-		http.Error(rw, "failed to parse form", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 		return
 	}
 	req.Field1 = r.FormValue("field1")
@@ -110,7 +157,7 @@ func (w *ServerInterfaceWrapper) EchoForm(rw http.ResponseWriter, r *http.Reques
 func (w *ServerInterfaceWrapper) EchoMultipart(rw http.ResponseWriter, r *http.Request) {
 	var req EchoMultipartMultipartRequest
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		http.Error(rw, "failed to parse multipart form", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 		return
 	}
 	if r.MultipartForm != nil && r.MultipartForm.File != nil {
@@ -131,7 +178,7 @@ func (w *ServerInterfaceWrapper) GetItem(rw http.ResponseWriter, r *http.Request
 	if v := r.URL.Query().Get("limit"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			http.Error(rw, "invalid limit", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "query", Name: "limit", Reason: "invalid", Err: err})
 			return
 		}
 		params.Limit = &parsed
@@ -143,7 +190,7 @@ func (w *ServerInterfaceWrapper) GetItem(rw http.ResponseWriter, r *http.Request
 	if v := r.Header.Get("X-Retry-Count"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			http.Error(rw, "invalid X-Retry-Count", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "header", Name: "X-Retry-Count", Reason: "invalid", Err: err})
 			return
 		}
 		headers.XRetryCount = &parsed
@@ -178,13 +225,13 @@ func (w *ServerInterfaceWrapper) GetSession(rw http.ResponseWriter, r *http.Requ
 	if c, err := r.Cookie("session_id"); err == nil {
 		cookies.SessionID = c.Value
 	} else {
-		http.Error(rw, "missing session_id", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "cookie", Name: "session_id", Reason: "missing"})
 		return
 	}
 	if c, err := r.Cookie("status"); err == nil {
 		typed := Status(c.Value)
 		if !typed.IsValid() {
-			http.Error(rw, "invalid status", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "cookie", Name: "status", Reason: "invalid"})
 			return
 		}
 		cookies.Status = &typed
@@ -192,7 +239,7 @@ func (w *ServerInterfaceWrapper) GetSession(rw http.ResponseWriter, r *http.Requ
 	if c, err := r.Cookie("visits"); err == nil {
 		parsed, err := strconv.Atoi(c.Value)
 		if err != nil {
-			http.Error(rw, "invalid visits", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "cookie", Name: "visits", Reason: "invalid", Err: err})
 			return
 		}
 		cookies.Visits = &parsed
@@ -205,24 +252,24 @@ func (w *ServerInterfaceWrapper) GetWhoami(rw http.ResponseWriter, r *http.Reque
 	if v := r.Header.Get("X-User-ID"); v != "" {
 		headers.XUserID = v
 	} else {
-		http.Error(rw, "missing X-User-ID", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "header", Name: "X-User-ID", Reason: "missing"})
 		return
 	}
 	if v := r.Header.Get("X-Tenant-ID"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			http.Error(rw, "invalid X-Tenant-ID", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "header", Name: "X-Tenant-ID", Reason: "invalid", Err: err})
 			return
 		}
 		headers.XTenantID = parsed
 	} else {
-		http.Error(rw, "missing X-Tenant-ID", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "header", Name: "X-Tenant-ID", Reason: "missing"})
 		return
 	}
 	if v := r.Header.Get("X-Status"); v != "" {
 		typed := Status(v)
 		if !typed.IsValid() {
-			http.Error(rw, "invalid X-Status", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "header", Name: "X-Status", Reason: "invalid"})
 			return
 		}
 		headers.XStatus = &typed
@@ -230,7 +277,7 @@ func (w *ServerInterfaceWrapper) GetWhoami(rw http.ResponseWriter, r *http.Reque
 	if v := r.Header.Get("X-Since"); v != "" {
 		parsed, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			http.Error(rw, "invalid X-Since", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "header", Name: "X-Since", Reason: "invalid", Err: err})
 			return
 		}
 		headers.XSince = &parsed
@@ -243,30 +290,30 @@ func (w *ServerInterfaceWrapper) Search(rw http.ResponseWriter, r *http.Request)
 	if v := r.URL.Query().Get("user"); v != "" {
 		params.User = v
 	} else {
-		http.Error(rw, "missing user", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "query", Name: "user", Reason: "missing"})
 		return
 	}
 	if v := r.URL.Query().Get("tenant"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			http.Error(rw, "invalid tenant", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "query", Name: "tenant", Reason: "invalid", Err: err})
 			return
 		}
 		params.Tenant = parsed
 	} else {
-		http.Error(rw, "missing tenant", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "query", Name: "tenant", Reason: "missing"})
 		return
 	}
 	if values := r.URL.Query()["tags"]; len(values) > 0 {
 		params.Tags = values
 	} else {
-		http.Error(rw, "missing tags", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "query", Name: "tags", Reason: "missing"})
 		return
 	}
 	if v := r.URL.Query().Get("status"); v != "" {
 		typed := Status(v)
 		if !typed.IsValid() {
-			http.Error(rw, "invalid status", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "query", Name: "status", Reason: "invalid"})
 			return
 		}
 		params.Status = &typed
@@ -274,7 +321,7 @@ func (w *ServerInterfaceWrapper) Search(rw http.ResponseWriter, r *http.Request)
 	if v := r.URL.Query().Get("since"); v != "" {
 		parsed, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			http.Error(rw, "invalid since", http.StatusBadRequest)
+			w.requestError(rw, r, &RequestError{In: "query", Name: "since", Reason: "invalid", Err: err})
 			return
 		}
 		params.Since = &parsed
@@ -297,6 +344,8 @@ func Handler(si ServerInterface) http.Handler {
 type ChiServerOptions struct {
 	BaseURL     string
 	Middlewares []func(http.Handler) http.Handler
+	// RequestErrorHandler is copied to ServerInterfaceWrapper.RequestErrorHandler.
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handler {
@@ -306,7 +355,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Use(m)
 	}
 
-	wrapper := &ServerInterfaceWrapper{Handler: si}
+	wrapper := &ServerInterfaceWrapper{Handler: si, RequestErrorHandler: options.RequestErrorHandler}
 
 	r.Method("POST", options.BaseURL+"/echo/json", http.HandlerFunc(wrapper.EchoJSON))
 	r.Method("POST", options.BaseURL+"/echo/form", http.HandlerFunc(wrapper.EchoForm))

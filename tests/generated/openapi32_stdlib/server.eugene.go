@@ -54,6 +54,42 @@ type ListItemsQueryParams struct {
 	Filter *string
 }
 
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
 type ServerInterface interface {
 	// SearchItems - Search using QUERY method
 	SearchItems(w http.ResponseWriter, r *http.Request)
@@ -71,6 +107,17 @@ type ServerInterface interface {
 
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+	// RequestErrorHandler answers requests rejected before the operation runs,
+	// with err a *RequestError. Nil sends a 400 with err.Error().
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+}
+
+func (w *ServerInterfaceWrapper) requestError(rw http.ResponseWriter, r *http.Request, err error) {
+	if w.RequestErrorHandler != nil {
+		w.RequestErrorHandler(rw, r, err)
+		return
+	}
+	http.Error(rw, err.Error(), http.StatusBadRequest)
 }
 
 func (w *ServerInterfaceWrapper) SearchItems(rw http.ResponseWriter, r *http.Request) {
@@ -100,7 +147,7 @@ func (w *ServerInterfaceWrapper) StreamJsonl(rw http.ResponseWriter, r *http.Req
 func (w *ServerInterfaceWrapper) AdvancedSearch(rw http.ResponseWriter, r *http.Request) {
 	var query AdvancedSearchQuery
 	if err := decodeQueryString(r, &query); err != nil {
-		http.Error(rw, "invalid query parameters", http.StatusBadRequest)
+		w.requestError(rw, r, &RequestError{In: "querystring", Name: "query", Reason: "invalid", Err: err})
 		return
 	}
 	w.Handler.AdvancedSearch(rw, r, &query)
@@ -129,11 +176,13 @@ func Handler(si ServerInterface) http.Handler {
 type StdlibServerOptions struct {
 	BaseURL     string
 	Middlewares []func(http.Handler) http.Handler
+	// RequestErrorHandler is copied to ServerInterfaceWrapper.RequestErrorHandler.
+	RequestErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 func HandlerWithOptions(si ServerInterface, options StdlibServerOptions) http.Handler {
 	mux := http.NewServeMux()
-	wrapper := &ServerInterfaceWrapper{Handler: si}
+	wrapper := &ServerInterfaceWrapper{Handler: si, RequestErrorHandler: options.RequestErrorHandler}
 
 	mux.HandleFunc("QUERY "+options.BaseURL+"/search", wrapper.SearchItems)
 	mux.HandleFunc("GET "+options.BaseURL+"/events", wrapper.StreamEvents)

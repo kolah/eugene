@@ -110,7 +110,7 @@ type {{ .ID | pascalCase }}FormRequest struct {
 
 type {{ .ID | pascalCase }}QueryParams struct {
 {{- range .QueryParams }}
-	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }} `query:"{{ .Name }}"`
+	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }}
 {{- end }}
 }
 {{- end }}
@@ -118,7 +118,7 @@ type {{ .ID | pascalCase }}QueryParams struct {
 
 type {{ .ID | pascalCase }}HeaderParams struct {
 {{- range .HeaderParams }}
-	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }} `header:"{{ .Name }}"`
+	{{ .GoName }} {{ if not .Required }}*{{ end }}{{ .Type }}
 {{- end }}
 }
 {{- end }}
@@ -131,6 +131,7 @@ type {{ .ID | pascalCase }}CookieParams struct {
 }
 {{- end }}
 {{- end }}
+{{- template "requestErrorType" true }}
 
 type ServerInterface interface {
 {{- range .Operations }}
@@ -148,81 +149,45 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 {{- if eq .Type "uuid.UUID" }}
 	var {{ .GoName | camelCase }} uuid.UUID
 	if err := {{ .GoName | camelCase }}.UnmarshalText([]byte(ctx.Param("{{ .Name }}"))); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+{{- template "reject" dict "Echo" true "Writer" "" "Handler" "" "In" "path" "Name" .Name "Reason" "invalid" "Err" "err" }}
 	}
 {{- else if .IsEnum }}
 	{{ .GoName | camelCase }} := {{ .Type }}(ctx.Param("{{ .Name }}"))
 	if !{{ .GoName | camelCase }}.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+{{- template "reject" dict "Echo" true "Writer" "" "Handler" "" "In" "path" "Name" .Name "Reason" "invalid" "Err" "" }}
 	}
 {{- else }}
 	{{ .GoName | camelCase }} := ctx.Param("{{ .Name }}")
 {{- end }}
 {{- end }}
 {{- if .HasQueryParams }}
-{{- range .QueryParams }}
-{{- if .Required }}
-	if {{ if hasPrefix .Type "[]" }}len(ctx.QueryParams()["{{ .Name }}"]) == 0{{ else }}ctx.QueryParam("{{ .Name }}") == ""{{ end }} {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing {{ .Name }}")
-	}
-{{- end }}
-{{- end }}
 	var params {{ .ID | pascalCase }}QueryParams
-	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
-	}
 {{- range .QueryParams }}
-{{- if .IsEnum }}
-	if {{ if not .Required }}params.{{ .GoName }} != nil && {{ end }}!params.{{ .GoName }}.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
-	}
-{{- else if .IsEnumArray }}
-	if params.{{ .GoName }} != nil {
-		for _, v := range {{ if not .Required }}*{{ end }}params.{{ .GoName }} {
-			if !v.IsValid() {
-				return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
-			}
-		}
-	}
-{{- end }}
+{{- template "param" dict "Source" "query" "Echo" true "Writer" "" "Handler" "" "Target" "params" "Param" . }}
 {{- end }}
 {{- end }}
 {{- if .HasHeaderParams }}
-{{- range .HeaderParams }}
-{{- if .Required }}
-	if ctx.Request().Header.Get("{{ .Name }}") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing {{ .Name }}")
-	}
-{{- end }}
-{{- end }}
 	var headers {{ .ID | pascalCase }}HeaderParams
-	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
-	}
 {{- range .HeaderParams }}
-{{- if .IsEnum }}
-	if {{ if not .Required }}headers.{{ .GoName }} != nil && {{ end }}!headers.{{ .GoName }}.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
-	}
-{{- end }}
+{{- template "param" dict "Source" "header" "Echo" true "Writer" "" "Handler" "" "Target" "headers" "Param" . }}
 {{- end }}
 {{- end }}
 {{- if .HasCookieParams }}
 	var cookies {{ .ID | pascalCase }}CookieParams
 {{- range .CookieParams }}
-{{- template "scalarParam" dict "Source" "cookie" "Echo" true "Writer" "" "Target" "cookies" "Param" . }}
+{{- template "param" dict "Source" "cookie" "Echo" true "Writer" "" "Handler" "" "Target" "cookies" "Param" . }}
 {{- end }}
 {{- end }}
 {{- if .HasQueryString }}
 	var {{ .QueryString.GoName | camelCase }} {{ .QueryString.Type }}
 	if err := ctx.Bind(&{{ .QueryString.GoName | camelCase }}); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+{{- template "reject" dict "Echo" true "Writer" "" "Handler" "" "In" "querystring" "Name" .QueryString.Name "Reason" "invalid" "Err" "err" }}
 	}
 {{- end }}
 {{- if .IsMultipart }}
 	var req {{ .ID | pascalCase }}MultipartRequest
 	if err := ctx.Request().ParseMultipartForm(32 << 20); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "failed to parse multipart form")
+{{- template "reject" dict "Echo" true "Writer" "" "Handler" "" "In" "body" "Name" "" "Reason" "invalid" "Err" "err" }}
 	}
 {{- range .RequestBody.MultipartFields }}
 {{- if .IsFile }}
@@ -247,7 +212,7 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 {{- if .IsFormUrlEncoded }}
 	var req {{ .ID | pascalCase }}FormRequest
 	if err := ctx.Request().ParseForm(); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "failed to parse form")
+{{- template "reject" dict "Echo" true "Writer" "" "Handler" "" "In" "body" "Name" "" "Reason" "invalid" "Err" "err" }}
 	}
 {{- range .RequestBody.MultipartFields }}
 {{- if .IsArray }}

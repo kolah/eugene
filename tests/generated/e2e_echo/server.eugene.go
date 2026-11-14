@@ -22,21 +22,21 @@ type EchoMultipartMultipartRequest struct {
 }
 
 type GetItemQueryParams struct {
-	Filter *string `query:"filter"`
-	Limit  *int    `query:"limit"`
+	Filter *string
+	Limit  *int
 }
 
 type GetItemHeaderParams struct {
-	XRequestID  *string `header:"X-Request-ID"`
-	XRetryCount *int    `header:"X-Retry-Count"`
+	XRequestID  *string
+	XRetryCount *int
 }
 
 type GetDayQueryParams struct {
-	Since *string `query:"since"`
+	Since *string
 }
 
 type GetDayHeaderParams struct {
-	XUntil *string `header:"X-Until"`
+	XUntil *string
 }
 
 type GetSessionCookieParams struct {
@@ -46,18 +46,58 @@ type GetSessionCookieParams struct {
 }
 
 type GetWhoamiHeaderParams struct {
-	XUserID   string     `header:"X-User-ID"`
-	XTenantID int        `header:"X-Tenant-ID"`
-	XStatus   *Status    `header:"X-Status"`
-	XSince    *time.Time `header:"X-Since"`
+	XUserID   string
+	XTenantID int
+	XStatus   *Status
+	XSince    *time.Time
 }
 
 type SearchQueryParams struct {
-	User   string     `query:"user"`
-	Tenant int        `query:"tenant"`
-	Tags   []string   `query:"tags"`
-	Status *Status    `query:"status"`
-	Since  *time.Time `query:"since"`
+	User   string
+	Tenant int
+	Tags   []string
+	Status *Status
+	Since  *time.Time
+}
+
+// RequestError reports a request rejected before the operation was called.
+// Error returns the text sent to the client. Err can quote the raw input, so
+// keep it out of responses.
+type RequestError struct {
+	// In is where the value was expected: path, query, querystring, header, cookie or body.
+	In string
+	// Name is the parameter name as written in the spec; empty for the body.
+	Name string
+	// Reason is "missing" or "invalid".
+	Reason string
+	// Err is the parse error, if any.
+	Err error
+}
+
+func (e *RequestError) Error() string {
+	switch e.In {
+	case "body":
+		return "invalid request body"
+	case "querystring":
+		return "invalid querystring"
+	}
+	return e.Reason + " " + e.Name
+}
+
+func (e *RequestError) Unwrap() error { return e.Err }
+
+// Location returns In. With Parameter and Missing it lets one interface match
+// the request errors of every generated package.
+func (e *RequestError) Location() string { return e.In }
+
+// Parameter returns Name.
+func (e *RequestError) Parameter() string { return e.Name }
+
+// Missing reports whether a required value was absent.
+func (e *RequestError) Missing() bool { return e.Reason == "missing" }
+
+func newRequestError(re *RequestError) error {
+	return echo.NewHTTPError(http.StatusBadRequest, re.Error()).SetInternal(re)
 }
 
 type ServerInterface interface {
@@ -98,7 +138,7 @@ func (w *ServerInterfaceWrapper) EchoJSON(ctx echo.Context) error {
 func (w *ServerInterfaceWrapper) EchoForm(ctx echo.Context) error {
 	var req EchoFormFormRequest
 	if err := ctx.Request().ParseForm(); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "failed to parse form")
+		return newRequestError(&RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 	}
 	req.Field1 = ctx.FormValue("field1")
 	req.Field2 = ctx.FormValue("field2")
@@ -109,7 +149,7 @@ func (w *ServerInterfaceWrapper) EchoForm(ctx echo.Context) error {
 func (w *ServerInterfaceWrapper) EchoMultipart(ctx echo.Context) error {
 	var req EchoMultipartMultipartRequest
 	if err := ctx.Request().ParseMultipartForm(32 << 20); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "failed to parse multipart form")
+		return newRequestError(&RequestError{In: "body", Name: "", Reason: "invalid", Err: err})
 	}
 	if file, err := ctx.FormFile("file"); err == nil {
 		req.File = file
@@ -121,12 +161,26 @@ func (w *ServerInterfaceWrapper) EchoMultipart(ctx echo.Context) error {
 func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 	id := ctx.Param("id")
 	var params GetItemQueryParams
-	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	if v := ctx.QueryParam("filter"); v != "" {
+		params.Filter = &v
+	}
+	if v := ctx.QueryParam("limit"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "limit", Reason: "invalid", Err: err})
+		}
+		params.Limit = &parsed
 	}
 	var headers GetItemHeaderParams
-	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	if v := ctx.Request().Header.Get("X-Request-ID"); v != "" {
+		headers.XRequestID = &v
+	}
+	if v := ctx.Request().Header.Get("X-Retry-Count"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Retry-Count", Reason: "invalid", Err: err})
+		}
+		headers.XRetryCount = &parsed
 	}
 	return w.Handler.GetItem(ctx, id, params, headers)
 }
@@ -134,12 +188,12 @@ func (w *ServerInterfaceWrapper) GetItem(ctx echo.Context) error {
 func (w *ServerInterfaceWrapper) GetDay(ctx echo.Context) error {
 	day := ctx.Param("day")
 	var params GetDayQueryParams
-	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	if v := ctx.QueryParam("since"); v != "" {
+		params.Since = &v
 	}
 	var headers GetDayHeaderParams
-	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	if v := ctx.Request().Header.Get("X-Until"); v != "" {
+		headers.XUntil = &v
 	}
 	return w.Handler.GetDay(ctx, day, params, headers)
 }
@@ -158,19 +212,19 @@ func (w *ServerInterfaceWrapper) GetSession(ctx echo.Context) error {
 	if c, err := ctx.Cookie("session_id"); err == nil {
 		cookies.SessionID = c.Value
 	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing session_id")
+		return newRequestError(&RequestError{In: "cookie", Name: "session_id", Reason: "missing"})
 	}
 	if c, err := ctx.Cookie("status"); err == nil {
 		typed := Status(c.Value)
 		if !typed.IsValid() {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
+			return newRequestError(&RequestError{In: "cookie", Name: "status", Reason: "invalid"})
 		}
 		cookies.Status = &typed
 	}
 	if c, err := ctx.Cookie("visits"); err == nil {
 		parsed, err := strconv.Atoi(c.Value)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid visits")
+			return newRequestError(&RequestError{In: "cookie", Name: "visits", Reason: "invalid", Err: err})
 		}
 		cookies.Visits = &parsed
 	}
@@ -178,38 +232,72 @@ func (w *ServerInterfaceWrapper) GetSession(ctx echo.Context) error {
 }
 
 func (w *ServerInterfaceWrapper) GetWhoami(ctx echo.Context) error {
-	if ctx.Request().Header.Get("X-User-ID") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-User-ID")
-	}
-	if ctx.Request().Header.Get("X-Tenant-ID") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Tenant-ID")
-	}
 	var headers GetWhoamiHeaderParams
-	if err := (&echo.DefaultBinder{}).BindHeaders(ctx, &headers); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid header parameters")
+	if v := ctx.Request().Header.Get("X-User-ID"); v != "" {
+		headers.XUserID = v
+	} else {
+		return newRequestError(&RequestError{In: "header", Name: "X-User-ID", Reason: "missing"})
 	}
-	if headers.XStatus != nil && !headers.XStatus.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Status")
+	if v := ctx.Request().Header.Get("X-Tenant-ID"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Tenant-ID", Reason: "invalid", Err: err})
+		}
+		headers.XTenantID = parsed
+	} else {
+		return newRequestError(&RequestError{In: "header", Name: "X-Tenant-ID", Reason: "missing"})
+	}
+	if v := ctx.Request().Header.Get("X-Status"); v != "" {
+		typed := Status(v)
+		if !typed.IsValid() {
+			return newRequestError(&RequestError{In: "header", Name: "X-Status", Reason: "invalid"})
+		}
+		headers.XStatus = &typed
+	}
+	if v := ctx.Request().Header.Get("X-Since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "header", Name: "X-Since", Reason: "invalid", Err: err})
+		}
+		headers.XSince = &parsed
 	}
 	return w.Handler.GetWhoami(ctx, headers)
 }
 
 func (w *ServerInterfaceWrapper) Search(ctx echo.Context) error {
-	if ctx.QueryParam("user") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing user")
-	}
-	if ctx.QueryParam("tenant") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing tenant")
-	}
-	if len(ctx.QueryParams()["tags"]) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "missing tags")
-	}
 	var params SearchQueryParams
-	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	if v := ctx.QueryParam("user"); v != "" {
+		params.User = v
+	} else {
+		return newRequestError(&RequestError{In: "query", Name: "user", Reason: "missing"})
 	}
-	if params.Status != nil && !params.Status.IsValid() {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
+	if v := ctx.QueryParam("tenant"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "tenant", Reason: "invalid", Err: err})
+		}
+		params.Tenant = parsed
+	} else {
+		return newRequestError(&RequestError{In: "query", Name: "tenant", Reason: "missing"})
+	}
+	if values := ctx.QueryParams()["tags"]; len(values) > 0 {
+		params.Tags = values
+	} else {
+		return newRequestError(&RequestError{In: "query", Name: "tags", Reason: "missing"})
+	}
+	if v := ctx.QueryParam("status"); v != "" {
+		typed := Status(v)
+		if !typed.IsValid() {
+			return newRequestError(&RequestError{In: "query", Name: "status", Reason: "invalid"})
+		}
+		params.Status = &typed
+	}
+	if v := ctx.QueryParam("since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return newRequestError(&RequestError{In: "query", Name: "since", Reason: "invalid", Err: err})
+		}
+		params.Since = &parsed
 	}
 	return w.Handler.Search(ctx, params)
 }

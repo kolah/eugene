@@ -176,6 +176,19 @@ type GetPetResponse interface {
 }
 ```
 
+Errors returned by an operation never reach the client. With Echo they go to
+the instance's `HTTPErrorHandler`. With chi and stdlib the default is a bare
+500; pass `StrictOptions` to log the error or write your own response:
+
+```go
+RegisterStrictHandlers(router, impl, StrictOptions{
+    ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+        slog.ErrorContext(r.Context(), "operation failed", "err", err)
+        http.Error(w, "internal error", http.StatusInternalServerError)
+    },
+})
+```
+
 ### Client (`client.go`)
 
 HTTP client with typed methods:

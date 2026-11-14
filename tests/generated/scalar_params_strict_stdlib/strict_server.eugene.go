@@ -9,14 +9,30 @@ import (
 	"github.com/gofrs/uuid/v5"
 )
 
+// StrictOptions configures a strict handler.
+type StrictOptions struct {
+	// ErrorHandler writes the response when an operation returns an error or its
+	// response cannot be written. The default sends a bare 500 without the error.
+	ErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+}
+
 // StrictHandler wraps a StrictServerInterface to handle stdlib requests.
 type StrictHandler struct {
-	ssi StrictServerInterface
+	ssi          StrictServerInterface
+	errorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // NewStrictHandler creates a new StrictHandler.
-func NewStrictHandler(ssi StrictServerInterface) *StrictHandler {
-	return &StrictHandler{ssi: ssi}
+func NewStrictHandler(ssi StrictServerInterface, opts ...StrictOptions) *StrictHandler {
+	h := &StrictHandler{ssi: ssi, errorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}}
+	for _, o := range opts {
+		if o.ErrorHandler != nil {
+			h.errorHandler = o.ErrorHandler
+		}
+	}
+	return h
 }
 
 // GetPrefs handles GET /prefs
@@ -312,12 +328,12 @@ func (h *StrictHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.ssi.GetPrefs(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitGetPrefsResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -331,12 +347,12 @@ func (h *StrictHandler) GetDevice(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.ssi.GetDevice(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitGetDeviceResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -360,18 +376,18 @@ func (h *StrictHandler) StreamEvents(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.ssi.StreamEvents(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitStreamEventsResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
 // RegisterStrictHandlers registers all strict handlers with the http.ServeMux.
-func RegisterStrictHandlers(mux *http.ServeMux, ssi StrictServerInterface) {
-	h := NewStrictHandler(ssi)
+func RegisterStrictHandlers(mux *http.ServeMux, ssi StrictServerInterface, opts ...StrictOptions) {
+	h := NewStrictHandler(ssi, opts...)
 
 	mux.HandleFunc("GET /prefs", h.GetPrefs)
 	mux.HandleFunc("GET /devices/{id}", h.GetDevice)

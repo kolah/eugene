@@ -10,14 +10,30 @@ import (
 	"github.com/gofrs/uuid/v5"
 )
 
+// StrictOptions configures a strict handler.
+type StrictOptions struct {
+	// ErrorHandler writes the response when an operation returns an error or its
+	// response cannot be written. The default sends a bare 500 without the error.
+	ErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+}
+
 // StrictChiHandler wraps a StrictServerInterface to handle Chi requests.
 type StrictChiHandler struct {
-	ssi StrictServerInterface
+	ssi          StrictServerInterface
+	errorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // NewStrictHandler creates a new StrictChiHandler.
-func NewStrictHandler(ssi StrictServerInterface) *StrictChiHandler {
-	return &StrictChiHandler{ssi: ssi}
+func NewStrictHandler(ssi StrictServerInterface, opts ...StrictOptions) *StrictChiHandler {
+	h := &StrictChiHandler{ssi: ssi, errorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}}
+	for _, o := range opts {
+		if o.ErrorHandler != nil {
+			h.errorHandler = o.ErrorHandler
+		}
+	}
+	return h
 }
 
 // GetPrefs handles GET /prefs
@@ -313,12 +329,12 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.ssi.GetPrefs(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitGetPrefsResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -332,12 +348,12 @@ func (h *StrictChiHandler) GetDevice(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.ssi.GetDevice(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitGetDeviceResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -361,18 +377,18 @@ func (h *StrictChiHandler) StreamEvents(w http.ResponseWriter, r *http.Request) 
 
 	response, err := h.ssi.StreamEvents(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitStreamEventsResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
 // RegisterStrictHandlers registers all strict handlers with the Chi router.
-func RegisterStrictHandlers(r chi.Router, ssi StrictServerInterface) {
-	h := NewStrictHandler(ssi)
+func RegisterStrictHandlers(r chi.Router, ssi StrictServerInterface, opts ...StrictOptions) {
+	h := NewStrictHandler(ssi, opts...)
 
 	r.Method("GET", "/prefs", http.HandlerFunc(h.GetPrefs))
 	r.Method("GET", "/devices/{id}", http.HandlerFunc(h.GetDevice))

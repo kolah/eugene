@@ -9,14 +9,30 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// StrictOptions configures a strict handler.
+type StrictOptions struct {
+	// ErrorHandler writes the response when an operation returns an error or its
+	// response cannot be written. The default sends a bare 500 without the error.
+	ErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
+}
+
 // StrictChiHandler wraps a StrictServerInterface to handle Chi requests.
 type StrictChiHandler struct {
-	ssi StrictServerInterface
+	ssi          StrictServerInterface
+	errorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 // NewStrictHandler creates a new StrictChiHandler.
-func NewStrictHandler(ssi StrictServerInterface) *StrictChiHandler {
-	return &StrictChiHandler{ssi: ssi}
+func NewStrictHandler(ssi StrictServerInterface, opts ...StrictOptions) *StrictChiHandler {
+	h := &StrictChiHandler{ssi: ssi, errorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}}
+	for _, o := range opts {
+		if o.ErrorHandler != nil {
+			h.errorHandler = o.ErrorHandler
+		}
+	}
+	return h
 }
 
 // ListItems handles GET /items
@@ -33,12 +49,12 @@ func (h *StrictChiHandler) ListItems(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.ssi.ListItems(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitListItemsResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -47,19 +63,19 @@ func (h *StrictChiHandler) CreateItem(w http.ResponseWriter, r *http.Request) {
 	var request CreateItemRequestObject
 	var body NewItem
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	request.Body = body
 
 	response, err := h.ssi.CreateItem(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitCreateItemResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -68,12 +84,12 @@ func (h *StrictChiHandler) GetItem(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.ssi.GetItem(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitGetItemResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -82,19 +98,19 @@ func (h *StrictChiHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 	var request UpdateItemRequestObject
 	var body NewItem
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 	request.Body = body
 
 	response, err := h.ssi.UpdateItem(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitUpdateItemResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -103,12 +119,12 @@ func (h *StrictChiHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.ssi.DeleteItem(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitDeleteItemResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -135,12 +151,12 @@ func (h *StrictChiHandler) ListLegacyLinks(w http.ResponseWriter, r *http.Reques
 
 	response, err := h.ssi.ListLegacyLinks(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitListLegacyLinksResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
@@ -160,18 +176,18 @@ func (h *StrictChiHandler) GetLegacyLink(w http.ResponseWriter, r *http.Request)
 
 	response, err := h.ssi.GetLegacyLink(r.Context(), request)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 		return
 	}
 
 	if err := response.VisitGetLegacyLinkResponseObject(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.errorHandler(w, r, err)
 	}
 }
 
 // RegisterStrictHandlers registers all strict handlers with the Chi router.
-func RegisterStrictHandlers(r chi.Router, ssi StrictServerInterface) {
-	h := NewStrictHandler(ssi)
+func RegisterStrictHandlers(r chi.Router, ssi StrictServerInterface, opts ...StrictOptions) {
+	h := NewStrictHandler(ssi, opts...)
 
 	r.Method("GET", "/items", http.HandlerFunc(h.ListItems))
 	r.Method("POST", "/items", http.HandlerFunc(h.CreateItem))

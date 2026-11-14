@@ -42,7 +42,7 @@ func (h *StrictEchoHandler) CreateItem(ctx echo.Context) error {
 	var request CreateItemRequestObject
 	var body NewItem
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 	request.Body = body
 
@@ -70,7 +70,7 @@ func (h *StrictEchoHandler) UpdateItem(ctx echo.Context) error {
 	var request UpdateItemRequestObject
 	var body NewItem
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 	request.Body = body
 

@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	routingClient "github.com/kolah/eugene/v2/tests/generated/client"
-	basic "github.com/kolah/eugene/v2/tests/generated/e2e_echo"
 	chiGen "github.com/kolah/eugene/v2/tests/generated/e2e_chi"
+	basic "github.com/kolah/eugene/v2/tests/generated/e2e_echo"
 	stdlibGen "github.com/kolah/eugene/v2/tests/generated/e2e_stdlib"
 	strict "github.com/kolah/eugene/v2/tests/generated/e2e_strict_echo"
 )

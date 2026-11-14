@@ -24,7 +24,7 @@ func (h *StrictEchoHandler) EchoJSON(ctx echo.Context) error {
 	var request EchoJSONRequestObject
 	var body EchoPayload
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 	request.Body = body
 
@@ -41,7 +41,7 @@ func (h *StrictEchoHandler) EchoForm(ctx echo.Context) error {
 	var request EchoFormRequestObject
 	var body any
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 	request.Body = body
 
@@ -58,7 +58,7 @@ func (h *StrictEchoHandler) EchoMultipart(ctx echo.Context) error {
 	var request EchoMultipartRequestObject
 	var body any
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 	request.Body = body
 
@@ -127,7 +127,7 @@ func (h *StrictEchoHandler) CreateResource(ctx echo.Context) error {
 	var request CreateResourceRequestObject
 	var body NewResource
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 	request.Body = body
 
@@ -284,7 +284,7 @@ func (h *StrictEchoHandler) CreateShape(ctx echo.Context) error {
 	var request CreateShapeRequestObject
 	var body Shape
 	if err := ctx.Bind(&body); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 	request.Body = body
 

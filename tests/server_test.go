@@ -2,8 +2,10 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -441,4 +443,93 @@ func TestEnumArrayQueryParams(t *testing.T) {
 			require.Equal(t, http.StatusBadRequest, rec.Code)
 		})
 	}
+}
+
+var errSecret = errors.New("db: password=hunter2")
+
+type failingStrictEchoHandler struct {
+	strictEcho.StrictServerInterface
+}
+
+func (failingStrictEchoHandler) CreateItem(context.Context, strictEcho.CreateItemRequestObject) (strictEcho.CreateItemResponseObject, error) {
+	return nil, errSecret
+}
+
+type failingStrictChiHandler struct {
+	strictChi.StrictServerInterface
+}
+
+func (failingStrictChiHandler) CreateItem(context.Context, strictChi.CreateItemRequestObject) (strictChi.CreateItemResponseObject, error) {
+	return nil, errSecret
+}
+
+type failingStrictStdlibHandler struct {
+	strictStdlib.StrictServerInterface
+}
+
+func (failingStrictStdlibHandler) CreateItem(context.Context, strictStdlib.CreateItemRequestObject) (strictStdlib.CreateItemResponseObject, error) {
+	return nil, errSecret
+}
+
+func TestStrictErrorsStayOffTheWire(t *testing.T) {
+	strictEchoServer := echo.New()
+	strictEcho.RegisterStrictHandlers(strictEchoServer, failingStrictEchoHandler{})
+	strictChiRouter := chi.NewRouter()
+	strictChi.RegisterStrictHandlers(strictChiRouter, failingStrictChiHandler{})
+	strictStdlibMux := http.NewServeMux()
+	strictStdlib.RegisterStrictHandlers(strictStdlibMux, failingStrictStdlibHandler{})
+
+	servers := map[string]http.Handler{
+		"strict echo":   strictEchoServer,
+		"strict chi":    strictChiRouter,
+		"strict stdlib": strictStdlibMux,
+	}
+	post := func(h http.Handler, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/items", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	for name, h := range servers {
+		t.Run(name, func(t *testing.T) {
+			t.Run("malformed body", func(t *testing.T) {
+				rec := post(h, `{"name": nope-secret}`)
+				require.Equal(t, http.StatusBadRequest, rec.Code)
+				require.Contains(t, rec.Body.String(), "invalid request body")
+				require.NotContains(t, rec.Body.String(), "nope-secret")
+				require.NotContains(t, rec.Body.String(), "invalid character")
+			})
+			t.Run("handler error", func(t *testing.T) {
+				rec := post(h, `{"name": "a"}`)
+				require.Equal(t, http.StatusInternalServerError, rec.Code)
+				require.NotContains(t, rec.Body.String(), "hunter2")
+			})
+		})
+	}
+
+	t.Run("error handler receives the error", func(t *testing.T) {
+		var gotChi, gotStdlib error
+		chiRouter := chi.NewRouter()
+		strictChi.RegisterStrictHandlers(chiRouter, failingStrictChiHandler{}, strictChi.StrictOptions{
+			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+				gotChi = err
+				http.Error(w, "custom", http.StatusTeapot)
+			},
+		})
+		stdlibMux := http.NewServeMux()
+		strictStdlib.RegisterStrictHandlers(stdlibMux, failingStrictStdlibHandler{}, strictStdlib.StrictOptions{
+			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+				gotStdlib = err
+				http.Error(w, "custom", http.StatusTeapot)
+			},
+		})
+		for name, h := range map[string]http.Handler{"chi": chiRouter, "stdlib": stdlibMux} {
+			rec := post(h, `{"name": "a"}`)
+			require.Equal(t, http.StatusTeapot, rec.Code, name)
+			require.Equal(t, "custom\n", rec.Body.String(), name)
+		}
+		require.ErrorIs(t, gotChi, errSecret)
+		require.ErrorIs(t, gotStdlib, errSecret)
+	})
 }

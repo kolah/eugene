@@ -134,7 +134,7 @@ func TestTypeResolver_UUIDType(t *testing.T) {
 		{"default string", "", "string", ""},
 		{"explicit string", "string", "string", ""},
 		{"google", "google", "uuid.UUID", "github.com/google/uuid"},
-		{"gofrs", "gofrs", "uuid.UUID", "github.com/gofrs/uuid"},
+		{"gofrs", "gofrs", "uuid.UUID", "github.com/gofrs/uuid/v5"},
 	}
 
 	for _, tt := range tests {

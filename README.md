@@ -75,7 +75,7 @@ Go Flags:
   -p, --package string             Go package name
   -f, --server-framework string    Server framework: echo, chi, stdlib
       --enum-strategy string       Enum strategy: const, type, struct
-      --uuid-package string        UUID type: string, google, gofrs
+      --uuid-package string        UUID type: string, google, gofrs (github.com/gofrs/uuid/v5)
       --nullable-strategy string   Nullable strategy: pointer, nullable
       --allof-strategy string      AllOf strategy: embed, flatten
       --enable-yaml-tags           Generate yaml tags alongside json tags
@@ -114,7 +114,7 @@ go:
 
   types:
     enum-strategy: const      # const, type, or struct
-    uuid-package: google      # string, google, or gofrs
+    uuid-package: google      # string, google, or gofrs (github.com/gofrs/uuid/v5)
     nullable-strategy: pointer # pointer or nullable
     allof-strategy: embed      # embed or flatten
 

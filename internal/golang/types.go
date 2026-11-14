@@ -358,7 +358,7 @@ func (r *TypeResolver) UUIDImport() string {
 	case "google":
 		return "github.com/google/uuid"
 	case "gofrs":
-		return "github.com/gofrs/uuid"
+		return "github.com/gofrs/uuid/v5"
 	default:
 		return ""
 	}

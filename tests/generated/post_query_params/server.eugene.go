@@ -29,6 +29,9 @@ type ServerInterfaceWrapper struct {
 }
 
 func (w *ServerInterfaceWrapper) SearchItems(ctx echo.Context) error {
+	if ctx.QueryParam("q") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q")
+	}
 	var params SearchItemsQueryParams
 	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
@@ -37,6 +40,9 @@ func (w *ServerInterfaceWrapper) SearchItems(ctx echo.Context) error {
 }
 
 func (w *ServerInterfaceWrapper) CreateSearch(ctx echo.Context) error {
+	if ctx.QueryParam("q") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q")
+	}
 	var params CreateSearchQueryParams
 	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")

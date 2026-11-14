@@ -29,6 +29,19 @@ func (e XMode) IsValid() bool {
 
 // GetPrefsRequestObject represents the request for GetPrefs.
 type GetPrefsRequestObject struct {
+	QSid     string     // query parameter
+	QCount   *int       // query parameter
+	QCount32 int32      // query parameter
+	QCount64 *int64     // query parameter
+	QRatio   *float64   // query parameter
+	QBeta    *bool      // query parameter
+	QDevice  *uuid.UUID // query parameter
+	QSince   *time.Time // query parameter
+	QTheme   *Theme     // query parameter
+	QMode    XMode      // query parameter
+	QToken   *Token     // query parameter
+	QTags    []string   // query parameter
+	QThemes  *[]Theme   // query parameter
 	XSid     string     // header parameter
 	XCount   *int       // header parameter
 	XCount32 int32      // header parameter

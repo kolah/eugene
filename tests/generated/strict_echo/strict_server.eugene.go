@@ -22,11 +22,11 @@ func NewStrictHandler(ssi StrictServerInterface) *StrictEchoHandler {
 func (h *StrictEchoHandler) ListItems(ctx echo.Context) error {
 	var request ListItemsRequestObject
 	if v := ctx.QueryParam("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid limit")
-		} else {
-			request.Limit = &parsed
 		}
+		request.Limit = &parsed
 	}
 
 	response, err := h.ssi.ListItems(ctx.Request().Context(), request)
@@ -98,6 +98,8 @@ func (h *StrictEchoHandler) ListLegacyLinks(ctx echo.Context) error {
 	var request ListLegacyLinksRequestObject
 	if values := ctx.QueryParams()["kinds"]; len(values) > 0 {
 		request.Kinds = values
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing kinds")
 	}
 	if values := ctx.QueryParams()["scopes"]; len(values) > 0 {
 		typed := make([]LinkScope, len(values))

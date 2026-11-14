@@ -30,6 +30,19 @@ paths:
         - {name: X-Mode, in: header, schema: {type: string, enum: [compact, wide]}}
         - {name: X-Token, in: header, schema: {$ref: "#/components/schemas/Token"}}
         - {name: X-Tags, in: header, required: true, schema: {type: array, items: {type: string}}}
+        - {name: q_sid, in: query, required: true, schema: {type: string}}
+        - {name: q_count, in: query, schema: {type: integer}}
+        - {name: q_count32, in: query, required: true, schema: {type: integer, format: int32}}
+        - {name: q_count64, in: query, schema: {type: integer, format: int64}}
+        - {name: q_ratio, in: query, schema: {type: number}}
+        - {name: q_beta, in: query, schema: {type: boolean}}
+        - {name: q_device, in: query, schema: {type: string, format: uuid}}
+        - {name: q_since, in: query, schema: {type: string, format: date-time}}
+        - {name: q_theme, in: query, schema: {$ref: "#/components/schemas/Theme"}}
+        - {name: q_mode, in: query, required: true, schema: {type: string, enum: [compact, wide]}}
+        - {name: q_token, in: query, schema: {$ref: "#/components/schemas/Token"}}
+        - {name: q_tags, in: query, required: true, schema: {type: array, items: {type: string}}}
+        - {name: q_themes, in: query, schema: {type: array, items: {$ref: "#/components/schemas/Theme"}}}
       responses:
         "204":
           description: ok

@@ -170,6 +170,13 @@ type GetWhoamiResponse struct {
 	Raw        *http.Response
 }
 
+// SearchResponse contains typed response data for Search.
+type SearchResponse struct {
+	StatusCode int
+	JSON200    *Whoami
+	Raw        *http.Response
+}
+
 // GetSecureDataResponse contains typed response data for GetSecureData.
 type GetSecureDataResponse struct {
 	StatusCode int
@@ -706,6 +713,68 @@ func (c *Client) GetWhoami(ctx context.Context, params *GetWhoamiParams) (*GetWh
 	return result, nil
 }
 
+func (c *Client) Search(ctx context.Context, params *SearchParams) (*SearchResponse, error) {
+	path := "/search"
+	if params != nil {
+		q := url.Values{}
+		q.Set("user", fmt.Sprint(params.User))
+		q.Set("tenant", fmt.Sprint(params.Tenant))
+		for _, v := range params.Tags {
+			q.Add("tags", fmt.Sprint(v))
+		}
+		if params.Status != nil {
+			q.Set("status", fmt.Sprint(*params.Status))
+		}
+		if params.Since != nil {
+			q.Set("since", fmt.Sprint(*params.Since))
+		}
+		if len(q) > 0 {
+			path += "?" + q.Encode()
+		}
+	}
+
+	var bodyReader io.Reader
+
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+path, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	httpReq.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	result := &SearchResponse{
+		StatusCode: resp.StatusCode,
+		Raw:        resp,
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return result, fmt.Errorf("reading response: %w", err)
+	}
+
+	switch resp.StatusCode {
+	case 200:
+		var body Whoami
+		if len(bodyBytes) > 0 {
+			if err := json.Unmarshal(bodyBytes, &body); err != nil {
+				return result, fmt.Errorf("decoding response: %w", err)
+			}
+		}
+		result.JSON200 = &body
+	}
+
+	if resp.StatusCode >= 400 {
+		return result, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return result, nil
+}
+
 func (c *Client) GetSecureData(ctx context.Context) (*GetSecureDataResponse, error) {
 	path := "/secure/data"
 
@@ -837,4 +906,12 @@ type GetWhoamiParams struct {
 	XTenantID int
 	XStatus   *Status
 	XSince    *string
+}
+
+type SearchParams struct {
+	User   string
+	Tenant int
+	Tags   []string
+	Status *Status
+	Since  *string
 }

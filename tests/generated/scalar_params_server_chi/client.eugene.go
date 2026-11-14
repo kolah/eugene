@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -221,6 +222,47 @@ type GetPrefsResponse struct {
 
 func (c *Client) GetPrefs(ctx context.Context, params *GetPrefsParams) (*GetPrefsResponse, error) {
 	path := "/prefs"
+	if params != nil {
+		q := url.Values{}
+		q.Set("q_sid", fmt.Sprint(params.QSid))
+		if params.QCount != nil {
+			q.Set("q_count", fmt.Sprint(*params.QCount))
+		}
+		q.Set("q_count32", fmt.Sprint(params.QCount32))
+		if params.QCount64 != nil {
+			q.Set("q_count64", fmt.Sprint(*params.QCount64))
+		}
+		if params.QRatio != nil {
+			q.Set("q_ratio", fmt.Sprint(*params.QRatio))
+		}
+		if params.QBeta != nil {
+			q.Set("q_beta", fmt.Sprint(*params.QBeta))
+		}
+		if params.QDevice != nil {
+			q.Set("q_device", fmt.Sprint(*params.QDevice))
+		}
+		if params.QSince != nil {
+			q.Set("q_since", fmt.Sprint(*params.QSince))
+		}
+		if params.QTheme != nil {
+			q.Set("q_theme", fmt.Sprint(*params.QTheme))
+		}
+		q.Set("q_mode", fmt.Sprint(params.QMode))
+		if params.QToken != nil {
+			q.Set("q_token", fmt.Sprint(*params.QToken))
+		}
+		for _, v := range params.QTags {
+			q.Add("q_tags", fmt.Sprint(v))
+		}
+		if params.QThemes != nil {
+			for _, v := range *params.QThemes {
+				q.Add("q_themes", fmt.Sprint(v))
+			}
+		}
+		if len(q) > 0 {
+			path += "?" + q.Encode()
+		}
+	}
 
 	var bodyReader io.Reader
 
@@ -343,6 +385,19 @@ func (c *Client) StreamEvents(ctx context.Context, params *StreamEventsParams) (
 }
 
 type GetPrefsParams struct {
+	QSid     string
+	QCount   *int
+	QCount32 int32
+	QCount64 *int64
+	QRatio   *float64
+	QBeta    *bool
+	QDevice  *string
+	QSince   *string
+	QTheme   *Theme
+	QMode    string
+	QToken   *Token
+	QTags    []string
+	QThemes  *[]Theme
 	XSid     string
 	XCount   *int
 	XCount32 int32

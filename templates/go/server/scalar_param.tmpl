@@ -1,15 +1,17 @@
-{{- /* Binds one scalar in: header or in: cookie param.
-Called with dict "Source" ("header"|"cookie") "Echo" bool "Writer" string "Target" string "Param" parameterData.
-An empty header counts as absent; an empty cookie counts as present. */ -}}
+{{- /* Binds one scalar in: query, in: header or in: cookie param.
+Called with dict "Source" ("query"|"header"|"cookie") "Echo" bool "Writer" string "Target" string "Param" parameterData.
+An empty query value or header counts as absent; an empty cookie counts as present. */ -}}
 {{- define "scalarParam" }}
 {{- $echo := .Echo }}
 {{- $writer := .Writer }}
 {{- $target := .Target }}
-{{- $header := eq .Source "header" }}
-{{- $value := "c.Value" }}
-{{- if $header }}{{ $value = "v" }}{{ end }}
+{{- $source := .Source }}
+{{- $value := "v" }}
+{{- if eq $source "cookie" }}{{ $value = "c.Value" }}{{ end }}
 {{- with .Param }}
-{{- if $header }}
+{{- if eq $source "query" }}
+	if v := {{ if $echo }}ctx.QueryParam{{ else }}r.URL.Query().Get{{ end }}("{{ .Name }}"); v != "" {
+{{- else if eq $source "header" }}
 	if v := {{ if $echo }}ctx.Request().Header{{ else }}r.Header{{ end }}.Get("{{ .Name }}"); v != "" {
 {{- else }}
 	if c, err := {{ if $echo }}ctx.Cookie{{ else }}r.Cookie{{ end }}("{{ .Name }}"); err == nil {

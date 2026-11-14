@@ -50,6 +50,14 @@ type GetWhoamiHeaderParams struct {
 	XSince    *time.Time
 }
 
+type SearchQueryParams struct {
+	User   string
+	Tenant int
+	Tags   []string
+	Status *Status
+	Since  *time.Time
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(w http.ResponseWriter, r *http.Request)
@@ -69,6 +77,8 @@ type ServerInterface interface {
 	GetSession(w http.ResponseWriter, r *http.Request, cookies GetSessionCookieParams)
 	// GetWhoami
 	GetWhoami(w http.ResponseWriter, r *http.Request, headers GetWhoamiHeaderParams)
+	// Search
+	Search(w http.ResponseWriter, r *http.Request, params SearchQueryParams)
 	// GetSecureData
 	GetSecureData(w http.ResponseWriter, r *http.Request)
 	// CreateShape
@@ -117,12 +127,12 @@ func (w *ServerInterfaceWrapper) GetItem(rw http.ResponseWriter, r *http.Request
 		params.Filter = &v
 	}
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
 			http.Error(rw, "invalid limit", http.StatusBadRequest)
 			return
-		} else {
-			params.Limit = &parsed
 		}
+		params.Limit = &parsed
 	}
 	var headers GetItemHeaderParams
 	if v := r.Header.Get("X-Request-ID"); v != "" {
@@ -226,6 +236,50 @@ func (w *ServerInterfaceWrapper) GetWhoami(rw http.ResponseWriter, r *http.Reque
 	w.Handler.GetWhoami(rw, r, headers)
 }
 
+func (w *ServerInterfaceWrapper) Search(rw http.ResponseWriter, r *http.Request) {
+	var params SearchQueryParams
+	if v := r.URL.Query().Get("user"); v != "" {
+		params.User = v
+	} else {
+		http.Error(rw, "missing user", http.StatusBadRequest)
+		return
+	}
+	if v := r.URL.Query().Get("tenant"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			http.Error(rw, "invalid tenant", http.StatusBadRequest)
+			return
+		}
+		params.Tenant = parsed
+	} else {
+		http.Error(rw, "missing tenant", http.StatusBadRequest)
+		return
+	}
+	if values := r.URL.Query()["tags"]; len(values) > 0 {
+		params.Tags = values
+	} else {
+		http.Error(rw, "missing tags", http.StatusBadRequest)
+		return
+	}
+	if v := r.URL.Query().Get("status"); v != "" {
+		typed := Status(v)
+		if !typed.IsValid() {
+			http.Error(rw, "invalid status", http.StatusBadRequest)
+			return
+		}
+		params.Status = &typed
+	}
+	if v := r.URL.Query().Get("since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(rw, "invalid since", http.StatusBadRequest)
+			return
+		}
+		params.Since = &parsed
+	}
+	w.Handler.Search(rw, r, params)
+}
+
 func (w *ServerInterfaceWrapper) GetSecureData(rw http.ResponseWriter, r *http.Request) {
 	w.Handler.GetSecureData(rw, r)
 }
@@ -256,6 +310,7 @@ func HandlerWithOptions(si ServerInterface, options StdlibServerOptions) http.Ha
 	mux.HandleFunc("DELETE "+options.BaseURL+"/resources/{id}", wrapper.DeleteResource)
 	mux.HandleFunc("GET "+options.BaseURL+"/session", wrapper.GetSession)
 	mux.HandleFunc("GET "+options.BaseURL+"/whoami", wrapper.GetWhoami)
+	mux.HandleFunc("GET "+options.BaseURL+"/search", wrapper.Search)
 	mux.HandleFunc("GET "+options.BaseURL+"/secure/data", wrapper.GetSecureData)
 	mux.HandleFunc("POST "+options.BaseURL+"/shapes", wrapper.CreateShape)
 

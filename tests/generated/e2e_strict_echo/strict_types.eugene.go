@@ -64,6 +64,15 @@ type GetWhoamiRequestObject struct {
 	XSince    *time.Time // header parameter
 }
 
+// SearchRequestObject represents the request for Search.
+type SearchRequestObject struct {
+	User   string     // query parameter
+	Tenant int        // query parameter
+	Tags   []string   // query parameter
+	Status *Status    // query parameter
+	Since  *time.Time // query parameter
+}
+
 // CreateShapeRequestObject represents the request for CreateShape.
 type CreateShapeRequestObject struct {
 	Body Shape
@@ -203,6 +212,20 @@ func (r GetWhoami200JSONResponse) VisitGetWhoamiResponseObject(w http.ResponseWr
 	return json.NewEncoder(w).Encode(r)
 }
 
+// SearchResponseObject is the interface for Search responses.
+type SearchResponseObject interface {
+	VisitSearchResponseObject(w http.ResponseWriter) error
+}
+
+// Search200JSONResponse is the response for Search with status 200.
+type Search200JSONResponse Whoami
+
+func (r Search200JSONResponse) VisitSearchResponseObject(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	return json.NewEncoder(w).Encode(r)
+}
+
 // GetSecureDataResponseObject is the interface for GetSecureData responses.
 type GetSecureDataResponseObject interface {
 	VisitGetSecureDataResponseObject(w http.ResponseWriter) error
@@ -260,6 +283,8 @@ type StrictServerInterface interface {
 	GetSession(ctx context.Context, request GetSessionRequestObject) (GetSessionResponseObject, error)
 	// GetWhoami
 	GetWhoami(ctx context.Context, request GetWhoamiRequestObject) (GetWhoamiResponseObject, error)
+	// Search
+	Search(ctx context.Context, request SearchRequestObject) (SearchResponseObject, error)
 	// GetSecureData
 	GetSecureData(ctx context.Context) (GetSecureDataResponseObject, error)
 	// CreateShape

@@ -22,6 +22,112 @@ func NewStrictHandler(ssi StrictServerInterface) *StrictHandler {
 // GetPrefs handles GET /prefs
 func (h *StrictHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	var request GetPrefsRequestObject
+	if v := r.URL.Query().Get("q_sid"); v != "" {
+		request.QSid = v
+	} else {
+		http.Error(w, "missing q_sid", http.StatusBadRequest)
+		return
+	}
+	if v := r.URL.Query().Get("q_count"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			http.Error(w, "invalid q_count", http.StatusBadRequest)
+			return
+		}
+		request.QCount = &parsed
+	}
+	if v := r.URL.Query().Get("q_count32"); v != "" {
+		parsed64, err := strconv.ParseInt(v, 10, 32)
+		parsed := int32(parsed64)
+		if err != nil {
+			http.Error(w, "invalid q_count32", http.StatusBadRequest)
+			return
+		}
+		request.QCount32 = parsed
+	} else {
+		http.Error(w, "missing q_count32", http.StatusBadRequest)
+		return
+	}
+	if v := r.URL.Query().Get("q_count64"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid q_count64", http.StatusBadRequest)
+			return
+		}
+		request.QCount64 = &parsed
+	}
+	if v := r.URL.Query().Get("q_ratio"); v != "" {
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			http.Error(w, "invalid q_ratio", http.StatusBadRequest)
+			return
+		}
+		request.QRatio = &parsed
+	}
+	if v := r.URL.Query().Get("q_beta"); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			http.Error(w, "invalid q_beta", http.StatusBadRequest)
+			return
+		}
+		request.QBeta = &parsed
+	}
+	if v := r.URL.Query().Get("q_device"); v != "" {
+		parsed, err := uuid.Parse(v)
+		if err != nil {
+			http.Error(w, "invalid q_device", http.StatusBadRequest)
+			return
+		}
+		request.QDevice = &parsed
+	}
+	if v := r.URL.Query().Get("q_since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(w, "invalid q_since", http.StatusBadRequest)
+			return
+		}
+		request.QSince = &parsed
+	}
+	if v := r.URL.Query().Get("q_theme"); v != "" {
+		typed := Theme(v)
+		if !typed.IsValid() {
+			http.Error(w, "invalid q_theme", http.StatusBadRequest)
+			return
+		}
+		request.QTheme = &typed
+	}
+	if v := r.URL.Query().Get("q_mode"); v != "" {
+		typed := XMode(v)
+		if !typed.IsValid() {
+			http.Error(w, "invalid q_mode", http.StatusBadRequest)
+			return
+		}
+		request.QMode = typed
+	} else {
+		http.Error(w, "missing q_mode", http.StatusBadRequest)
+		return
+	}
+	if v := r.URL.Query().Get("q_token"); v != "" {
+		typed := Token(v)
+		request.QToken = &typed
+	}
+	if values := r.URL.Query()["q_tags"]; len(values) > 0 {
+		request.QTags = values
+	} else {
+		http.Error(w, "missing q_tags", http.StatusBadRequest)
+		return
+	}
+	if values := r.URL.Query()["q_themes"]; len(values) > 0 {
+		typed := make([]Theme, len(values))
+		for i, v := range values {
+			typed[i] = Theme(v)
+			if !typed[i].IsValid() {
+				http.Error(w, "invalid q_themes", http.StatusBadRequest)
+				return
+			}
+		}
+		request.QThemes = &typed
+	}
 	if v := r.Header.Get("X-Sid"); v != "" {
 		request.XSid = v
 	} else {

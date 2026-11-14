@@ -73,6 +73,22 @@ func (w *Writer) SendRaw(eventType string, data []byte) error {
 	return nil
 }
 
+type GetPrefsQueryParams struct {
+	QSid     string     `query:"q_sid"`
+	QCount   *int       `query:"q_count"`
+	QCount32 int32      `query:"q_count32"`
+	QCount64 *int64     `query:"q_count64"`
+	QRatio   *float64   `query:"q_ratio"`
+	QBeta    *bool      `query:"q_beta"`
+	QDevice  *uuid.UUID `query:"q_device"`
+	QSince   *time.Time `query:"q_since"`
+	QTheme   *Theme     `query:"q_theme"`
+	QMode    XMode      `query:"q_mode"`
+	QToken   *Token     `query:"q_token"`
+	QTags    []string   `query:"q_tags"`
+	QThemes  *[]Theme   `query:"q_themes"`
+}
+
 type GetPrefsHeaderParams struct {
 	XSid     string     `header:"X-Sid"`
 	XCount   *int       `header:"X-Count"`
@@ -109,7 +125,7 @@ type StreamEventsCookieParams struct {
 
 type ServerInterface interface {
 	// GetPrefs
-	GetPrefs(ctx echo.Context, headers GetPrefsHeaderParams, cookies GetPrefsCookieParams) error
+	GetPrefs(ctx echo.Context, params GetPrefsQueryParams, headers GetPrefsHeaderParams, cookies GetPrefsCookieParams) error
 	// StreamEvents (streaming)
 	StreamEvents(ctx echo.Context, cookies StreamEventsCookieParams) error
 }
@@ -119,6 +135,35 @@ type ServerInterfaceWrapper struct {
 }
 
 func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
+	if ctx.QueryParam("q_sid") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q_sid")
+	}
+	if ctx.QueryParam("q_count32") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q_count32")
+	}
+	if ctx.QueryParam("q_mode") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q_mode")
+	}
+	if len(ctx.QueryParams()["q_tags"]) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q_tags")
+	}
+	var params GetPrefsQueryParams
+	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	}
+	if params.QTheme != nil && !params.QTheme.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid q_theme")
+	}
+	if !params.QMode.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid q_mode")
+	}
+	if params.QThemes != nil {
+		for _, v := range *params.QThemes {
+			if !v.IsValid() {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid q_themes")
+			}
+		}
+	}
 	if ctx.Request().Header.Get("X-Sid") == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing X-Sid")
 	}
@@ -214,7 +259,7 @@ func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
 		typed := Token(c.Value)
 		cookies.Token = &typed
 	}
-	return w.Handler.GetPrefs(ctx, headers, cookies)
+	return w.Handler.GetPrefs(ctx, params, headers, cookies)
 }
 
 func (w *ServerInterfaceWrapper) StreamEvents(ctx echo.Context) error {

@@ -59,12 +59,12 @@ type ServerInterfaceWrapper struct {
 func (w *ServerInterfaceWrapper) ListItems(rw http.ResponseWriter, r *http.Request) {
 	var params ListItemsQueryParams
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
 			http.Error(rw, "invalid limit", http.StatusBadRequest)
 			return
-		} else {
-			params.Limit = &parsed
 		}
+		params.Limit = &parsed
 	}
 	w.Handler.ListItems(rw, r, params)
 }
@@ -89,6 +89,9 @@ func (w *ServerInterfaceWrapper) ListLegacyLinks(rw http.ResponseWriter, r *http
 	var params ListLegacyLinksQueryParams
 	if values := r.URL.Query()["kinds"]; len(values) > 0 {
 		params.Kinds = values
+	} else {
+		http.Error(rw, "missing kinds", http.StatusBadRequest)
+		return
 	}
 	if values := r.URL.Query()["scopes"]; len(values) > 0 {
 		typed := make([]LinkScope, len(values))

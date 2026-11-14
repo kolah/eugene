@@ -179,67 +179,17 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, 
 			}
 		}
 		{{ if .Required }}params.{{ .GoName }} = typed{{ else }}params.{{ .GoName }} = &typed{{ end }}
-	}
+	}{{ if .Required }} else {
+{{- template "paramError" dict "Echo" false "Writer" "rw" "Message" (printf "missing %s" .Name) }}
+	}{{ end }}
 {{- else if hasPrefix .Type "[]" }}
 	if values := r.URL.Query()["{{ .Name }}"]; len(values) > 0 {
 		{{ if .Required }}params.{{ .GoName }} = values{{ else }}params.{{ .GoName }} = &values{{ end }}
-	}
-{{- else if eq .Type "string" }}
-	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		{{ if .Required }}params.{{ .GoName }} = v{{ else }}params.{{ .GoName }} = &v{{ end }}
-	}
-{{- else if eq .Type "int" }}
-	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
-{{- else if eq .Type "int64" }}
-	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseInt(v, 10, 64); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
-{{- else if eq .Type "int32" }}
-	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseInt(v, 10, 32); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			val := int32(parsed)
-			{{ if .Required }}params.{{ .GoName }} = val{{ else }}params.{{ .GoName }} = &val{{ end }}
-		}
-	}
-{{- else if eq .Type "bool" }}
-	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseBool(v); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
-{{- else if eq .Type "uuid.UUID" }}
-	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		if parsed, err := uuid.Parse(v); err != nil {
-			http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
-			return
-		} else {
-			{{ if .Required }}params.{{ .GoName }} = parsed{{ else }}params.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
+	}{{ if .Required }} else {
+{{- template "paramError" dict "Echo" false "Writer" "rw" "Message" (printf "missing %s" .Name) }}
+	}{{ end }}
 {{- else }}
-	if v := r.URL.Query().Get("{{ .Name }}"); v != "" {
-		{{ if .Required }}typed := {{ .Type }}(v)
-		params.{{ .GoName }} = typed{{ else }}typed := {{ .Type }}(v)
-		params.{{ .GoName }} = &typed{{ end }}
-	}
+{{- template "scalarParam" dict "Source" "query" "Echo" false "Writer" "rw" "Target" "params" "Param" . }}
 {{- end }}
 {{- end }}
 {{- end }}

@@ -110,6 +110,10 @@ func (h *BasicEchoHandler) GetSession(ctx echo.Context, cookies basic.GetSession
 	})
 }
 
+func (h *BasicEchoHandler) Search(ctx echo.Context, params basic.SearchQueryParams) error {
+	return ctx.JSON(http.StatusOK, basic.Whoami{UserID: &params.User, TenantID: &params.Tenant, Status: params.Status, Since: params.Since})
+}
+
 func (h *BasicEchoHandler) GetWhoami(ctx echo.Context, headers basic.GetWhoamiHeaderParams) error {
 	return ctx.JSON(http.StatusOK, basic.Whoami{UserID: &headers.XUserID, TenantID: &headers.XTenantID, Status: headers.XStatus, Since: headers.XSince})
 }
@@ -195,6 +199,10 @@ func (h *StrictEchoHandler) GetSession(ctx context.Context, req strict.GetSessio
 		Status:    req.Status,
 		Visits:    req.Visits,
 	}, nil
+}
+
+func (h *StrictEchoHandler) Search(ctx context.Context, req strict.SearchRequestObject) (strict.SearchResponseObject, error) {
+	return strict.Search200JSONResponse{UserID: &req.User, TenantID: &req.Tenant, Status: req.Status, Since: req.Since}, nil
 }
 
 func (h *StrictEchoHandler) GetWhoami(ctx context.Context, req strict.GetWhoamiRequestObject) (strict.GetWhoamiResponseObject, error) {
@@ -313,6 +321,11 @@ func (h *ChiHandler) GetSession(w http.ResponseWriter, r *http.Request, cookies 
 		Status:    cookies.Status,
 		Visits:    cookies.Visits,
 	})
+}
+
+func (h *ChiHandler) Search(w http.ResponseWriter, r *http.Request, params chiGen.SearchQueryParams) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(chiGen.Whoami{UserID: &params.User, TenantID: &params.Tenant, Status: params.Status, Since: params.Since})
 }
 
 func (h *ChiHandler) GetWhoami(w http.ResponseWriter, r *http.Request, headers chiGen.GetWhoamiHeaderParams) {
@@ -451,6 +464,11 @@ func (h *StdlibHandler) GetSession(w http.ResponseWriter, r *http.Request, cooki
 		Status:    cookies.Status,
 		Visits:    cookies.Visits,
 	})
+}
+
+func (h *StdlibHandler) Search(w http.ResponseWriter, r *http.Request, params stdlibGen.SearchQueryParams) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stdlibGen.Whoami{UserID: &params.User, TenantID: &params.Tenant, Status: params.Status, Since: params.Since})
 }
 
 func (h *StdlibHandler) GetWhoami(w http.ResponseWriter, r *http.Request, headers stdlibGen.GetWhoamiHeaderParams) {
@@ -1411,3 +1429,80 @@ func TestE2EDiscriminator(t *testing.T) {
 
 // Ensure Chi imports are used
 var _ chi.Router
+
+func TestE2EQueryParams(t *testing.T) {
+	echoServer := echo.New()
+	basic.RegisterHandlers(echoServer, &BasicEchoHandler{})
+	strictServer := echo.New()
+	strict.RegisterStrictHandlers(strictServer, &StrictEchoHandler{})
+
+	servers := map[string]http.Handler{
+		"echo":        echoServer,
+		"strict echo": strictServer,
+		"chi":         chiGen.Handler(&ChiHandler{}),
+		"stdlib":      stdlibGen.Handler(&StdlibHandler{}),
+	}
+	for name, handler := range servers {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(handler)
+			defer server.Close()
+
+			get := func(t *testing.T, query string) (int, string) {
+				resp, err := http.Get(server.URL + "/search?" + query)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				return resp.StatusCode, string(body)
+			}
+
+			t.Run("required params arrive", func(t *testing.T) {
+				status, body := get(t, "user=user-1&tenant=7&tags=a")
+				assert.Equal(t, http.StatusOK, status)
+				assert.JSONEq(t, `{"userId":"user-1","tenantId":7}`, body)
+			})
+
+			t.Run("typed optional params arrive", func(t *testing.T) {
+				status, body := get(t, "user=user-1&tenant=7&tags=a&status=active&since=2026-11-14T10:00:00Z")
+				assert.Equal(t, http.StatusOK, status)
+				assert.JSONEq(t, `{"userId":"user-1","tenantId":7,"status":"active","since":"2026-11-14T10:00:00Z"}`, body)
+			})
+
+			t.Run("invalid enum returns 400", func(t *testing.T) {
+				status, body := get(t, "user=user-1&tenant=7&tags=a&status=bogus-value")
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.NotContains(t, body, "bogus-value")
+			})
+
+			t.Run("unparseable date-time returns 400", func(t *testing.T) {
+				status, body := get(t, "user=user-1&tenant=7&tags=a&since=yesterday-ish")
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.NotContains(t, body, "yesterday-ish")
+			})
+
+			t.Run("missing required string returns 400", func(t *testing.T) {
+				status, body := get(t, "tenant=7&tags=a")
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Contains(t, body, "missing user")
+			})
+
+			t.Run("empty required string returns 400", func(t *testing.T) {
+				status, body := get(t, "user=&tenant=7&tags=a")
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Contains(t, body, "missing user")
+			})
+
+			t.Run("missing required integer returns 400", func(t *testing.T) {
+				status, body := get(t, "user=user-1&tags=a")
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Contains(t, body, "missing tenant")
+			})
+
+			t.Run("missing required array returns 400", func(t *testing.T) {
+				status, body := get(t, "user=user-1&tenant=7")
+				assert.Equal(t, http.StatusBadRequest, status)
+				assert.Contains(t, body, "missing tags")
+			})
+		})
+	}
+}

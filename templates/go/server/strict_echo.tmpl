@@ -58,53 +58,17 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 			}
 		}
 		{{ if .Required }}request.{{ .GoName }} = typed{{ else }}request.{{ .GoName }} = &typed{{ end }}
-	}
+	}{{ if .Required }} else {
+{{- template "paramError" dict "Echo" true "Writer" "" "Message" (printf "missing %s" .Name) }}
+	}{{ end }}
 {{- else if hasPrefix .Type "[]" }}
 	if values := ctx.QueryParams()["{{ .Name }}"]; len(values) > 0 {
 		{{ if .Required }}request.{{ .GoName }} = values{{ else }}request.{{ .GoName }} = &values{{ end }}
-	}
-{{- else if eq .Type "string" }}
-	if v := ctx.QueryParam("{{ .Name }}"); v != "" {
-		request.{{ .GoName }} = {{ if not .Required }}&{{ end }}v
-	}
-{{- else if eq .Type "int" }}
-	if v := ctx.QueryParam("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
-		} else {
-			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
-{{- else if eq .Type "int64" }}
-	if v := ctx.QueryParam("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseInt(v, 10, 64); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
-		} else {
-			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
-{{- else if eq .Type "bool" }}
-	if v := ctx.QueryParam("{{ .Name }}"); v != "" {
-		if parsed, err := strconv.ParseBool(v); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
-		} else {
-			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
-{{- else if eq .Type "uuid.UUID" }}
-	if v := ctx.QueryParam("{{ .Name }}"); v != "" {
-		if parsed, err := uuid.Parse(v); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
-		} else {
-			{{ if .Required }}request.{{ .GoName }} = parsed{{ else }}request.{{ .GoName }} = &parsed{{ end }}
-		}
-	}
+	}{{ if .Required }} else {
+{{- template "paramError" dict "Echo" true "Writer" "" "Message" (printf "missing %s" .Name) }}
+	}{{ end }}
 {{- else }}
-	if v := ctx.QueryParam("{{ .Name }}"); v != "" {
-		{{ if .Required }}typed := {{ .Type }}(v)
-		request.{{ .GoName }} = typed{{ else }}typed := {{ .Type }}(v)
-		request.{{ .GoName }} = &typed{{ end }}
-	}
+{{- template "scalarParam" dict "Source" "query" "Echo" true "Writer" "" "Target" "request" "Param" . }}
 {{- end }}
 {{- end }}
 {{- range .HeaderParams }}

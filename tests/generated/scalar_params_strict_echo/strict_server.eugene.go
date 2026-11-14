@@ -23,6 +23,98 @@ func NewStrictHandler(ssi StrictServerInterface) *StrictEchoHandler {
 // GetPrefs handles GET /prefs
 func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 	var request GetPrefsRequestObject
+	if v := ctx.QueryParam("q_sid"); v != "" {
+		request.QSid = v
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q_sid")
+	}
+	if v := ctx.QueryParam("q_count"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_count")
+		}
+		request.QCount = &parsed
+	}
+	if v := ctx.QueryParam("q_count32"); v != "" {
+		parsed64, err := strconv.ParseInt(v, 10, 32)
+		parsed := int32(parsed64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_count32")
+		}
+		request.QCount32 = parsed
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q_count32")
+	}
+	if v := ctx.QueryParam("q_count64"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_count64")
+		}
+		request.QCount64 = &parsed
+	}
+	if v := ctx.QueryParam("q_ratio"); v != "" {
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_ratio")
+		}
+		request.QRatio = &parsed
+	}
+	if v := ctx.QueryParam("q_beta"); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_beta")
+		}
+		request.QBeta = &parsed
+	}
+	if v := ctx.QueryParam("q_device"); v != "" {
+		parsed, err := uuid.Parse(v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_device")
+		}
+		request.QDevice = &parsed
+	}
+	if v := ctx.QueryParam("q_since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_since")
+		}
+		request.QSince = &parsed
+	}
+	if v := ctx.QueryParam("q_theme"); v != "" {
+		typed := Theme(v)
+		if !typed.IsValid() {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_theme")
+		}
+		request.QTheme = &typed
+	}
+	if v := ctx.QueryParam("q_mode"); v != "" {
+		typed := XMode(v)
+		if !typed.IsValid() {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_mode")
+		}
+		request.QMode = typed
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q_mode")
+	}
+	if v := ctx.QueryParam("q_token"); v != "" {
+		typed := Token(v)
+		request.QToken = &typed
+	}
+	if values := ctx.QueryParams()["q_tags"]; len(values) > 0 {
+		request.QTags = values
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing q_tags")
+	}
+	if values := ctx.QueryParams()["q_themes"]; len(values) > 0 {
+		typed := make([]Theme, len(values))
+		for i, v := range values {
+			typed[i] = Theme(v)
+			if !typed[i].IsValid() {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid q_themes")
+			}
+		}
+		request.QThemes = &typed
+	}
 	if v := ctx.Request().Header.Get("X-Sid"); v != "" {
 		request.XSid = v
 	} else {

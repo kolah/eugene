@@ -52,6 +52,14 @@ type GetWhoamiHeaderParams struct {
 	XSince    *time.Time `header:"X-Since"`
 }
 
+type SearchQueryParams struct {
+	User   string     `query:"user"`
+	Tenant int        `query:"tenant"`
+	Tags   []string   `query:"tags"`
+	Status *Status    `query:"status"`
+	Since  *time.Time `query:"since"`
+}
+
 type ServerInterface interface {
 	// EchoJSON
 	EchoJSON(ctx echo.Context) error
@@ -71,6 +79,8 @@ type ServerInterface interface {
 	GetSession(ctx echo.Context, cookies GetSessionCookieParams) error
 	// GetWhoami
 	GetWhoami(ctx echo.Context, headers GetWhoamiHeaderParams) error
+	// Search
+	Search(ctx echo.Context, params SearchQueryParams) error
 	// GetSecureData
 	GetSecureData(ctx echo.Context) error
 	// CreateShape
@@ -184,6 +194,26 @@ func (w *ServerInterfaceWrapper) GetWhoami(ctx echo.Context) error {
 	return w.Handler.GetWhoami(ctx, headers)
 }
 
+func (w *ServerInterfaceWrapper) Search(ctx echo.Context) error {
+	if ctx.QueryParam("user") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing user")
+	}
+	if ctx.QueryParam("tenant") == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing tenant")
+	}
+	if len(ctx.QueryParams()["tags"]) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing tags")
+	}
+	var params SearchQueryParams
+	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
+	}
+	if params.Status != nil && !params.Status.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
+	}
+	return w.Handler.Search(ctx, params)
+}
+
 func (w *ServerInterfaceWrapper) GetSecureData(ctx echo.Context) error {
 	return w.Handler.GetSecureData(ctx)
 }
@@ -204,6 +234,7 @@ func RegisterHandlers(router Router, si ServerInterface) {
 	router.DELETE("/resources/:id", wrapper.DeleteResource)
 	router.GET("/session", wrapper.GetSession)
 	router.GET("/whoami", wrapper.GetWhoami)
+	router.GET("/search", wrapper.Search)
 	router.GET("/secure/data", wrapper.GetSecureData)
 	router.POST("/shapes", wrapper.CreateShape)
 }
@@ -220,6 +251,7 @@ func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL stri
 	router.DELETE(baseURL+"/resources/:id", wrapper.DeleteResource)
 	router.GET(baseURL+"/session", wrapper.GetSession)
 	router.GET(baseURL+"/whoami", wrapper.GetWhoami)
+	router.GET(baseURL+"/search", wrapper.Search)
 	router.GET(baseURL+"/secure/data", wrapper.GetSecureData)
 	router.POST(baseURL+"/shapes", wrapper.CreateShape)
 }

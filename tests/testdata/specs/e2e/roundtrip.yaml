@@ -222,6 +222,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Whoami"
 
+  /search:
+    get:
+      operationId: search
+      parameters:
+        - {name: user, in: query, required: true, schema: {type: string}}
+        - {name: tenant, in: query, required: true, schema: {type: integer}}
+        - {name: tags, in: query, required: true, schema: {type: array, items: {type: string}}}
+        - {name: status, in: query, schema: {$ref: "#/components/schemas/Status"}}
+        - {name: since, in: query, schema: {type: string, format: date-time}}
+      responses:
+        "200":
+          description: The matched caller
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Whoami"
+
   /secure/data:
     get:
       operationId: getSecureData

@@ -160,12 +160,23 @@ func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error 
 {{- end }}
 {{- end }}
 {{- if .HasQueryParams }}
+{{- range .QueryParams }}
+{{- if .Required }}
+	if {{ if hasPrefix .Type "[]" }}len(ctx.QueryParams()["{{ .Name }}"]) == 0{{ else }}ctx.QueryParam("{{ .Name }}") == ""{{ end }} {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing {{ .Name }}")
+	}
+{{- end }}
+{{- end }}
 	var params {{ .ID | pascalCase }}QueryParams
 	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")
 	}
 {{- range .QueryParams }}
-{{- if .IsEnumArray }}
+{{- if .IsEnum }}
+	if {{ if not .Required }}params.{{ .GoName }} != nil && {{ end }}!params.{{ .GoName }}.IsValid() {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
+	}
+{{- else if .IsEnumArray }}
 	if params.{{ .GoName }} != nil {
 		for _, v := range {{ if not .Required }}*{{ end }}params.{{ .GoName }} {
 			if !v.IsValid() {

@@ -72,6 +72,22 @@ func (w *Writer) SendRaw(eventType string, data []byte) error {
 	return nil
 }
 
+type GetPrefsQueryParams struct {
+	QSid     string
+	QCount   *int
+	QCount32 int32
+	QCount64 *int64
+	QRatio   *float64
+	QBeta    *bool
+	QDevice  *uuid.UUID
+	QSince   *time.Time
+	QTheme   *Theme
+	QMode    XMode
+	QToken   *Token
+	QTags    []string
+	QThemes  *[]Theme
+}
+
 type GetPrefsHeaderParams struct {
 	XSid     string
 	XCount   *int
@@ -108,7 +124,7 @@ type StreamEventsCookieParams struct {
 
 type ServerInterface interface {
 	// GetPrefs
-	GetPrefs(w http.ResponseWriter, r *http.Request, headers GetPrefsHeaderParams, cookies GetPrefsCookieParams)
+	GetPrefs(w http.ResponseWriter, r *http.Request, params GetPrefsQueryParams, headers GetPrefsHeaderParams, cookies GetPrefsCookieParams)
 	// StreamEvents (streaming)
 	StreamEvents(w http.ResponseWriter, r *http.Request, cookies StreamEventsCookieParams)
 }
@@ -118,6 +134,113 @@ type ServerInterfaceWrapper struct {
 }
 
 func (w *ServerInterfaceWrapper) GetPrefs(rw http.ResponseWriter, r *http.Request) {
+	var params GetPrefsQueryParams
+	if v := r.URL.Query().Get("q_sid"); v != "" {
+		params.QSid = v
+	} else {
+		http.Error(rw, "missing q_sid", http.StatusBadRequest)
+		return
+	}
+	if v := r.URL.Query().Get("q_count"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			http.Error(rw, "invalid q_count", http.StatusBadRequest)
+			return
+		}
+		params.QCount = &parsed
+	}
+	if v := r.URL.Query().Get("q_count32"); v != "" {
+		parsed64, err := strconv.ParseInt(v, 10, 32)
+		parsed := int32(parsed64)
+		if err != nil {
+			http.Error(rw, "invalid q_count32", http.StatusBadRequest)
+			return
+		}
+		params.QCount32 = parsed
+	} else {
+		http.Error(rw, "missing q_count32", http.StatusBadRequest)
+		return
+	}
+	if v := r.URL.Query().Get("q_count64"); v != "" {
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			http.Error(rw, "invalid q_count64", http.StatusBadRequest)
+			return
+		}
+		params.QCount64 = &parsed
+	}
+	if v := r.URL.Query().Get("q_ratio"); v != "" {
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			http.Error(rw, "invalid q_ratio", http.StatusBadRequest)
+			return
+		}
+		params.QRatio = &parsed
+	}
+	if v := r.URL.Query().Get("q_beta"); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			http.Error(rw, "invalid q_beta", http.StatusBadRequest)
+			return
+		}
+		params.QBeta = &parsed
+	}
+	if v := r.URL.Query().Get("q_device"); v != "" {
+		parsed, err := uuid.Parse(v)
+		if err != nil {
+			http.Error(rw, "invalid q_device", http.StatusBadRequest)
+			return
+		}
+		params.QDevice = &parsed
+	}
+	if v := r.URL.Query().Get("q_since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(rw, "invalid q_since", http.StatusBadRequest)
+			return
+		}
+		params.QSince = &parsed
+	}
+	if v := r.URL.Query().Get("q_theme"); v != "" {
+		typed := Theme(v)
+		if !typed.IsValid() {
+			http.Error(rw, "invalid q_theme", http.StatusBadRequest)
+			return
+		}
+		params.QTheme = &typed
+	}
+	if v := r.URL.Query().Get("q_mode"); v != "" {
+		typed := XMode(v)
+		if !typed.IsValid() {
+			http.Error(rw, "invalid q_mode", http.StatusBadRequest)
+			return
+		}
+		params.QMode = typed
+	} else {
+		http.Error(rw, "missing q_mode", http.StatusBadRequest)
+		return
+	}
+	if v := r.URL.Query().Get("q_token"); v != "" {
+		typed := Token(v)
+		params.QToken = &typed
+	}
+	if values := r.URL.Query()["q_tags"]; len(values) > 0 {
+		params.QTags = values
+	} else {
+		http.Error(rw, "missing q_tags", http.StatusBadRequest)
+		return
+	}
+	if values := r.URL.Query()["q_themes"]; len(values) > 0 {
+		typed := make([]Theme, len(values))
+		for i, v := range values {
+			typed[i] = Theme(v)
+			if !typed[i].IsValid() {
+				http.Error(rw, "invalid q_themes", http.StatusBadRequest)
+				return
+			}
+		}
+		params.QThemes = &typed
+	}
 	var headers GetPrefsHeaderParams
 	if v := r.Header.Get("X-Sid"); v != "" {
 		headers.XSid = v
@@ -298,7 +421,7 @@ func (w *ServerInterfaceWrapper) GetPrefs(rw http.ResponseWriter, r *http.Reques
 		typed := Token(c.Value)
 		cookies.Token = &typed
 	}
-	w.Handler.GetPrefs(rw, r, headers, cookies)
+	w.Handler.GetPrefs(rw, r, params, headers, cookies)
 }
 
 func (w *ServerInterfaceWrapper) StreamEvents(rw http.ResponseWriter, r *http.Request) {

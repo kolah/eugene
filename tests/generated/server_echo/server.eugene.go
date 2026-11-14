@@ -82,6 +82,9 @@ func (w *ServerInterfaceWrapper) DeleteItem(ctx echo.Context) error {
 }
 
 func (w *ServerInterfaceWrapper) ListLegacyLinks(ctx echo.Context) error {
+	if len(ctx.QueryParams()["kinds"]) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing kinds")
+	}
 	var params ListLegacyLinksQueryParams
 	if err := (&echo.DefaultBinder{}).BindQueryParams(ctx, &params); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid query parameters")

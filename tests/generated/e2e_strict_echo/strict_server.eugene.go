@@ -78,11 +78,11 @@ func (h *StrictEchoHandler) GetItem(ctx echo.Context) error {
 		request.Filter = &v
 	}
 	if v := ctx.QueryParam("limit"); v != "" {
-		if parsed, err := strconv.Atoi(v); err != nil {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid limit")
-		} else {
-			request.Limit = &parsed
 		}
+		request.Limit = &parsed
 	}
 	if v := ctx.Request().Header.Get("X-Request-ID"); v != "" {
 		request.XRequestID = &v
@@ -223,6 +223,51 @@ func (h *StrictEchoHandler) GetWhoami(ctx echo.Context) error {
 	return response.VisitGetWhoamiResponseObject(ctx.Response().Writer)
 }
 
+// Search handles GET /search
+func (h *StrictEchoHandler) Search(ctx echo.Context) error {
+	var request SearchRequestObject
+	if v := ctx.QueryParam("user"); v != "" {
+		request.User = v
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing user")
+	}
+	if v := ctx.QueryParam("tenant"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid tenant")
+		}
+		request.Tenant = parsed
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing tenant")
+	}
+	if values := ctx.QueryParams()["tags"]; len(values) > 0 {
+		request.Tags = values
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing tags")
+	}
+	if v := ctx.QueryParam("status"); v != "" {
+		typed := Status(v)
+		if !typed.IsValid() {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid status")
+		}
+		request.Status = &typed
+	}
+	if v := ctx.QueryParam("since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid since")
+		}
+		request.Since = &parsed
+	}
+
+	response, err := h.ssi.Search(ctx.Request().Context(), request)
+	if err != nil {
+		return err
+	}
+
+	return response.VisitSearchResponseObject(ctx.Response().Writer)
+}
+
 // GetSecureData handles GET /secure/data
 func (h *StrictEchoHandler) GetSecureData(ctx echo.Context) error {
 
@@ -264,6 +309,7 @@ func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	router.DELETE("/resources/:id", h.DeleteResource)
 	router.GET("/session", h.GetSession)
 	router.GET("/whoami", h.GetWhoami)
+	router.GET("/search", h.Search)
 	router.GET("/secure/data", h.GetSecureData)
 	router.POST("/shapes", h.CreateShape)
 }
@@ -281,6 +327,7 @@ func RegisterStrictHandlersWithBaseURL(router Router, ssi StrictServerInterface,
 	router.DELETE(baseURL+"/resources/:id", h.DeleteResource)
 	router.GET(baseURL+"/session", h.GetSession)
 	router.GET(baseURL+"/whoami", h.GetWhoami)
+	router.GET(baseURL+"/search", h.Search)
 	router.GET(baseURL+"/secure/data", h.GetSecureData)
 	router.POST(baseURL+"/shapes", h.CreateShape)
 }

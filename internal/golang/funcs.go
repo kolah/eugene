@@ -2,6 +2,7 @@ package golang
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -293,9 +294,9 @@ func StructTagWithOptions(s *model.Schema, name string, required bool, enableYAM
 	}
 
 	// Add extra tags from extensions
-	if ext != nil && ext.ExtraTags != nil {
-		for tagName, tagValue := range ext.ExtraTags {
-			tags = append(tags, fmt.Sprintf("%s:\"%s\"", tagName, tagValue))
+	if ext != nil {
+		for _, tagName := range slices.Sorted(maps.Keys(ext.ExtraTags)) {
+			tags = append(tags, fmt.Sprintf("%s:\"%s\"", tagName, ext.ExtraTags[tagName]))
 		}
 	}
 

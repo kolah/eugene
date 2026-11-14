@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 )
 
 type XMode string
@@ -67,6 +67,11 @@ type GetPrefsRequestObject struct {
 	Token    *Token     // cookie parameter
 }
 
+// GetDeviceRequestObject represents the request for GetDevice.
+type GetDeviceRequestObject struct {
+	ID uuid.UUID // path parameter
+}
+
 // StreamEventsRequestObject represents the request for StreamEvents.
 type StreamEventsRequestObject struct {
 	Sid   string     // cookie parameter
@@ -82,6 +87,19 @@ type GetPrefsResponseObject interface {
 type GetPrefs204Response struct{}
 
 func (r GetPrefs204Response) VisitGetPrefsResponseObject(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+// GetDeviceResponseObject is the interface for GetDevice responses.
+type GetDeviceResponseObject interface {
+	VisitGetDeviceResponseObject(w http.ResponseWriter) error
+}
+
+// GetDevice204Response is the response for GetDevice with status 204.
+type GetDevice204Response struct{}
+
+func (r GetDevice204Response) VisitGetDeviceResponseObject(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
@@ -104,6 +122,8 @@ func (r StreamEvents200JSONResponse) VisitStreamEventsResponseObject(w http.Resp
 type StrictServerInterface interface {
 	// GetPrefs
 	GetPrefs(ctx context.Context, request GetPrefsRequestObject) (GetPrefsResponseObject, error)
+	// GetDevice
+	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
 	// StreamEvents
 	StreamEvents(ctx context.Context, request StreamEventsRequestObject) (StreamEventsResponseObject, error)
 }

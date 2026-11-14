@@ -146,8 +146,8 @@ type ServerInterfaceWrapper struct {
 func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(ctx echo.Context) error {
 {{- range .Parameters }}
 {{- if eq .Type "uuid.UUID" }}
-	{{ .GoName | camelCase }}, err := uuid.Parse(ctx.Param("{{ .Name }}"))
-	if err != nil {
+	var {{ .GoName | camelCase }} uuid.UUID
+	if err := {{ .GoName | camelCase }}.UnmarshalText([]byte(ctx.Param("{{ .Name }}"))); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
 	}
 {{- else if .IsEnum }}

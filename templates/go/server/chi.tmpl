@@ -150,8 +150,8 @@ type ServerInterfaceWrapper struct {
 func (w *ServerInterfaceWrapper) {{ .ID | pascalCase }}(rw http.ResponseWriter, r *http.Request) {
 {{- range .Parameters }}
 {{- if eq .Type "uuid.UUID" }}
-	{{ .GoName | camelCase }}, err := uuid.Parse(chi.URLParam(r, "{{ .Name }}"))
-	if err != nil {
+	var {{ .GoName | camelCase }} uuid.UUID
+	if err := {{ .GoName | camelCase }}.UnmarshalText([]byte(chi.URLParam(r, "{{ .Name }}"))); err != nil {
 		http.Error(rw, "invalid {{ .Name }}", http.StatusBadRequest)
 		return
 	}

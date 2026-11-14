@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 )
 
 // StrictChiHandler wraps a StrictServerInterface to handle Chi requests.
@@ -74,7 +74,8 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		request.QBeta = &parsed
 	}
 	if v := r.URL.Query().Get("q_device"); v != "" {
-		parsed, err := uuid.Parse(v)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
 			http.Error(w, "invalid q_device", http.StatusBadRequest)
 			return
@@ -180,7 +181,8 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		request.XBeta = &parsed
 	}
 	if v := r.Header.Get("X-Device"); v != "" {
-		parsed, err := uuid.Parse(v)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
 			http.Error(w, "invalid X-Device", http.StatusBadRequest)
 			return
@@ -272,7 +274,8 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		request.Beta = &parsed
 	}
 	if c, err := r.Cookie("device"); err == nil {
-		parsed, err := uuid.Parse(c.Value)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(c.Value))
 		if err != nil {
 			http.Error(w, "invalid device", http.StatusBadRequest)
 			return
@@ -319,6 +322,25 @@ func (h *StrictChiHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetDevice handles GET /devices/{id}
+func (h *StrictChiHandler) GetDevice(w http.ResponseWriter, r *http.Request) {
+	var request GetDeviceRequestObject
+	if err := request.ID.UnmarshalText([]byte(chi.URLParam(r, "id"))); err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	response, err := h.ssi.GetDevice(r.Context(), request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := response.VisitGetDeviceResponseObject(w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 // StreamEvents handles GET /events
 func (h *StrictChiHandler) StreamEvents(w http.ResponseWriter, r *http.Request) {
 	var request StreamEventsRequestObject
@@ -353,5 +375,6 @@ func RegisterStrictHandlers(r chi.Router, ssi StrictServerInterface) {
 	h := NewStrictHandler(ssi)
 
 	r.Method("GET", "/prefs", http.HandlerFunc(h.GetPrefs))
+	r.Method("GET", "/devices/{id}", http.HandlerFunc(h.GetDevice))
 	r.Method("GET", "/events", http.HandlerFunc(h.StreamEvents))
 }

@@ -126,6 +126,8 @@ type StreamEventsCookieParams struct {
 type ServerInterface interface {
 	// GetPrefs
 	GetPrefs(ctx echo.Context, params GetPrefsQueryParams, headers GetPrefsHeaderParams, cookies GetPrefsCookieParams) error
+	// GetDevice
+	GetDevice(ctx echo.Context, id uuid.UUID) error
 	// StreamEvents (streaming)
 	StreamEvents(ctx echo.Context, cookies StreamEventsCookieParams) error
 }
@@ -228,7 +230,8 @@ func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
 		cookies.Beta = &parsed
 	}
 	if c, err := ctx.Cookie("device"); err == nil {
-		parsed, err := uuid.Parse(c.Value)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(c.Value))
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid device")
 		}
@@ -262,6 +265,14 @@ func (w *ServerInterfaceWrapper) GetPrefs(ctx echo.Context) error {
 	return w.Handler.GetPrefs(ctx, params, headers, cookies)
 }
 
+func (w *ServerInterfaceWrapper) GetDevice(ctx echo.Context) error {
+	var id uuid.UUID
+	if err := id.UnmarshalText([]byte(ctx.Param("id"))); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+	return w.Handler.GetDevice(ctx, id)
+}
+
 func (w *ServerInterfaceWrapper) StreamEvents(ctx echo.Context) error {
 	var cookies StreamEventsCookieParams
 	if c, err := ctx.Cookie("sid"); err == nil {
@@ -283,6 +294,7 @@ func RegisterHandlers(router Router, si ServerInterface) {
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
 	router.GET("/prefs", wrapper.GetPrefs)
+	router.GET("/devices/:id", wrapper.GetDevice)
 	router.GET("/events", wrapper.StreamEvents)
 }
 
@@ -290,5 +302,6 @@ func RegisterHandlersWithBaseURL(router Router, si ServerInterface, baseURL stri
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
 	router.GET(baseURL+"/prefs", wrapper.GetPrefs)
+	router.GET(baseURL+"/devices/:id", wrapper.GetDevice)
 	router.GET(baseURL+"/events", wrapper.StreamEvents)
 }

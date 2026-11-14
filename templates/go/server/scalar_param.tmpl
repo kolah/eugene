@@ -37,7 +37,8 @@ An empty query value or header counts as absent; an empty cookie counts as prese
 {{- else if eq .Type "bool" }}
 		parsed, err := strconv.ParseBool({{ $value }})
 {{- else if eq .Type "uuid.UUID" }}
-		parsed, err := uuid.Parse({{ $value }})
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte({{ $value }}))
 {{- else }}
 		parsed, err := time.Parse(time.RFC3339, {{ $value }})
 {{- end }}

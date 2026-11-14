@@ -220,6 +220,13 @@ type GetPrefsResponse struct {
 	Raw        *http.Response
 }
 
+// GetDeviceResponse contains typed response data for GetDevice.
+type GetDeviceResponse struct {
+	StatusCode int
+	JSON204    *struct{}
+	Raw        *http.Response
+}
+
 func (c *Client) GetPrefs(ctx context.Context, params *GetPrefsParams) (*GetPrefsResponse, error) {
 	path := "/prefs"
 	if params != nil {
@@ -348,6 +355,45 @@ func (c *Client) GetPrefs(ctx context.Context, params *GetPrefsParams) (*GetPref
 	defer resp.Body.Close()
 
 	result := &GetPrefsResponse{
+		StatusCode: resp.StatusCode,
+		Raw:        resp,
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return result, fmt.Errorf("reading response: %w", err)
+	}
+
+	switch resp.StatusCode {
+	case 204:
+	}
+
+	if resp.StatusCode >= 400 {
+		return result, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return result, nil
+}
+
+func (c *Client) GetDevice(ctx context.Context, id string) (*GetDeviceResponse, error) {
+	path := "/devices/{id}"
+	path = strings.Replace(path, "{id}", fmt.Sprint(id), 1)
+
+	var bodyReader io.Reader
+
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+path, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	httpReq.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	result := &GetDeviceResponse{
 		StatusCode: resp.StatusCode,
 		Raw:        resp,
 	}

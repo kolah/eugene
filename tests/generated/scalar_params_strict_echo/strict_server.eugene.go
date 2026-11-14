@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -67,7 +67,8 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		request.QBeta = &parsed
 	}
 	if v := ctx.QueryParam("q_device"); v != "" {
-		parsed, err := uuid.Parse(v)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid q_device")
 		}
@@ -159,7 +160,8 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		request.XBeta = &parsed
 	}
 	if v := ctx.Request().Header.Get("X-Device"); v != "" {
-		parsed, err := uuid.Parse(v)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid X-Device")
 		}
@@ -239,7 +241,8 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 		request.Beta = &parsed
 	}
 	if c, err := ctx.Cookie("device"); err == nil {
-		parsed, err := uuid.Parse(c.Value)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(c.Value))
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid device")
 		}
@@ -279,6 +282,21 @@ func (h *StrictEchoHandler) GetPrefs(ctx echo.Context) error {
 	return response.VisitGetPrefsResponseObject(ctx.Response().Writer)
 }
 
+// GetDevice handles GET /devices/{id}
+func (h *StrictEchoHandler) GetDevice(ctx echo.Context) error {
+	var request GetDeviceRequestObject
+	if err := request.ID.UnmarshalText([]byte(ctx.Param("id"))); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid id")
+	}
+
+	response, err := h.ssi.GetDevice(ctx.Request().Context(), request)
+	if err != nil {
+		return err
+	}
+
+	return response.VisitGetDeviceResponseObject(ctx.Response().Writer)
+}
+
 // StreamEvents handles GET /events
 func (h *StrictEchoHandler) StreamEvents(ctx echo.Context) error {
 	var request StreamEventsRequestObject
@@ -308,6 +326,7 @@ func RegisterStrictHandlers(router Router, ssi StrictServerInterface) {
 	h := NewStrictHandler(ssi)
 
 	router.GET("/prefs", h.GetPrefs)
+	router.GET("/devices/:id", h.GetDevice)
 	router.GET("/events", h.StreamEvents)
 }
 
@@ -316,5 +335,6 @@ func RegisterStrictHandlersWithBaseURL(router Router, ssi StrictServerInterface,
 	h := NewStrictHandler(ssi)
 
 	router.GET(baseURL+"/prefs", h.GetPrefs)
+	router.GET(baseURL+"/devices/:id", h.GetDevice)
 	router.GET(baseURL+"/events", h.StreamEvents)
 }

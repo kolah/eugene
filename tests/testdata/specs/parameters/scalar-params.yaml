@@ -46,6 +46,14 @@ paths:
       responses:
         "204":
           description: ok
+  /devices/{id}:
+    get:
+      operationId: getDevice
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: ok
   /events:
     get:
       operationId: streamEvents

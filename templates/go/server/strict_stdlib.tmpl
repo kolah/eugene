@@ -51,11 +51,9 @@ func (h *StrictHandler) {{ .ID }}(w http.ResponseWriter, r *http.Request) {
 {{- end }}
 {{- range .PathParams }}
 {{- if eq .Type "uuid.UUID" }}
-	if parsed, err := uuid.Parse(r.PathValue("{{ .Name }}")); err != nil {
+	if err := request.{{ .GoName }}.UnmarshalText([]byte(r.PathValue("{{ .Name }}"))); err != nil {
 		http.Error(w, "invalid {{ .Name }}", http.StatusBadRequest)
 		return
-	} else {
-		request.{{ .GoName }} = parsed
 	}
 {{- else if .IsEnum }}
 	request.{{ .GoName }} = {{ .Type }}(r.PathValue("{{ .Name }}"))

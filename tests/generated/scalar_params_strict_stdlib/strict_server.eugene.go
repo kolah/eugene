@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 )
 
 // StrictHandler wraps a StrictServerInterface to handle stdlib requests.
@@ -73,7 +73,8 @@ func (h *StrictHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		request.QBeta = &parsed
 	}
 	if v := r.URL.Query().Get("q_device"); v != "" {
-		parsed, err := uuid.Parse(v)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
 			http.Error(w, "invalid q_device", http.StatusBadRequest)
 			return
@@ -179,7 +180,8 @@ func (h *StrictHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		request.XBeta = &parsed
 	}
 	if v := r.Header.Get("X-Device"); v != "" {
-		parsed, err := uuid.Parse(v)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
 			http.Error(w, "invalid X-Device", http.StatusBadRequest)
 			return
@@ -271,7 +273,8 @@ func (h *StrictHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 		request.Beta = &parsed
 	}
 	if c, err := r.Cookie("device"); err == nil {
-		parsed, err := uuid.Parse(c.Value)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(c.Value))
 		if err != nil {
 			http.Error(w, "invalid device", http.StatusBadRequest)
 			return
@@ -318,6 +321,25 @@ func (h *StrictHandler) GetPrefs(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetDevice handles GET /devices/{id}
+func (h *StrictHandler) GetDevice(w http.ResponseWriter, r *http.Request) {
+	var request GetDeviceRequestObject
+	if err := request.ID.UnmarshalText([]byte(r.PathValue("id"))); err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	response, err := h.ssi.GetDevice(r.Context(), request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := response.VisitGetDeviceResponseObject(w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 // StreamEvents handles GET /events
 func (h *StrictHandler) StreamEvents(w http.ResponseWriter, r *http.Request) {
 	var request StreamEventsRequestObject
@@ -352,5 +374,6 @@ func RegisterStrictHandlers(mux *http.ServeMux, ssi StrictServerInterface) {
 	h := NewStrictHandler(ssi)
 
 	mux.HandleFunc("GET /prefs", h.GetPrefs)
+	mux.HandleFunc("GET /devices/{id}", h.GetDevice)
 	mux.HandleFunc("GET /events", h.StreamEvents)
 }

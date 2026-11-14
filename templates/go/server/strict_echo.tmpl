@@ -33,10 +33,8 @@ func (h *StrictEchoHandler) {{ .ID }}(ctx echo.Context) error {
 {{- end }}
 {{- range .PathParams }}
 {{- if eq .Type "uuid.UUID" }}
-	if parsed, err := uuid.Parse(ctx.Param("{{ .Name }}")); err != nil {
+	if err := request.{{ .GoName }}.UnmarshalText([]byte(ctx.Param("{{ .Name }}"))); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid {{ .Name }}")
-	} else {
-		request.{{ .GoName }} = parsed
 	}
 {{- else if .IsEnum }}
 	request.{{ .GoName }} = {{ .Type }}(ctx.Param("{{ .Name }}"))

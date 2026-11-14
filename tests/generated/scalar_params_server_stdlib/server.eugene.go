@@ -124,6 +124,8 @@ type StreamEventsCookieParams struct {
 type ServerInterface interface {
 	// GetPrefs
 	GetPrefs(w http.ResponseWriter, r *http.Request, params GetPrefsQueryParams, headers GetPrefsHeaderParams, cookies GetPrefsCookieParams)
+	// GetDevice
+	GetDevice(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	// StreamEvents (streaming)
 	StreamEvents(w http.ResponseWriter, r *http.Request, cookies StreamEventsCookieParams)
 }
@@ -185,7 +187,8 @@ func (w *ServerInterfaceWrapper) GetPrefs(rw http.ResponseWriter, r *http.Reques
 		params.QBeta = &parsed
 	}
 	if v := r.URL.Query().Get("q_device"); v != "" {
-		parsed, err := uuid.Parse(v)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
 			http.Error(rw, "invalid q_device", http.StatusBadRequest)
 			return
@@ -292,7 +295,8 @@ func (w *ServerInterfaceWrapper) GetPrefs(rw http.ResponseWriter, r *http.Reques
 		headers.XBeta = &parsed
 	}
 	if v := r.Header.Get("X-Device"); v != "" {
-		parsed, err := uuid.Parse(v)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(v))
 		if err != nil {
 			http.Error(rw, "invalid X-Device", http.StatusBadRequest)
 			return
@@ -385,7 +389,8 @@ func (w *ServerInterfaceWrapper) GetPrefs(rw http.ResponseWriter, r *http.Reques
 		cookies.Beta = &parsed
 	}
 	if c, err := r.Cookie("device"); err == nil {
-		parsed, err := uuid.Parse(c.Value)
+		var parsed uuid.UUID
+		err := parsed.UnmarshalText([]byte(c.Value))
 		if err != nil {
 			http.Error(rw, "invalid device", http.StatusBadRequest)
 			return
@@ -423,6 +428,15 @@ func (w *ServerInterfaceWrapper) GetPrefs(rw http.ResponseWriter, r *http.Reques
 	w.Handler.GetPrefs(rw, r, params, headers, cookies)
 }
 
+func (w *ServerInterfaceWrapper) GetDevice(rw http.ResponseWriter, r *http.Request) {
+	var id uuid.UUID
+	if err := id.UnmarshalText([]byte(r.PathValue("id"))); err != nil {
+		http.Error(rw, "invalid id", http.StatusBadRequest)
+		return
+	}
+	w.Handler.GetDevice(rw, r, id)
+}
+
 func (w *ServerInterfaceWrapper) StreamEvents(rw http.ResponseWriter, r *http.Request) {
 	var cookies StreamEventsCookieParams
 	if c, err := r.Cookie("sid"); err == nil {
@@ -456,6 +470,7 @@ func HandlerWithOptions(si ServerInterface, options StdlibServerOptions) http.Ha
 	wrapper := &ServerInterfaceWrapper{Handler: si}
 
 	mux.HandleFunc("GET "+options.BaseURL+"/prefs", wrapper.GetPrefs)
+	mux.HandleFunc("GET "+options.BaseURL+"/devices/{id}", wrapper.GetDevice)
 	mux.HandleFunc("GET "+options.BaseURL+"/events", wrapper.StreamEvents)
 
 	var handler http.Handler = mux
